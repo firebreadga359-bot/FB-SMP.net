@@ -1,0 +1,37 @@
+categories:
+  building:
+    items: [STONE, COBBLESTONE, OAK_PLANKS, GLASS]
+  farming:
+    items: [WHEAT_SEEDS, CARROT, POTATO, BONE_MEAL]
+  mining:
+    items: [TORCH, IRON_INGOT, COAL]
+  decoration:
+    items: [GLASS, LANTERN, FLOWER_POT]
+  utility:
+    items: [CHEST, CRAFTING_TABLE, ANVIL]
+  food:
+    items: [BREAD, COOKED_BEEF, BAKED_POTATO]
+  miscellaneous:
+    items: [PAPER, BOOK]
+prices:
+  STONE: "0.25"
+  COBBLESTONE: "0.15"
+  OAK_PLANKS: "0.30"
+  GLASS: "0.60"
+  WHEAT_SEEDS: "0.10"
+  CARROT: "0.25"
+  POTATO: "0.25"
+  BONE_MEAL: "0.75"
+  TORCH: "0.25"
+  IRON_INGOT: "4.00"
+  COAL: "1.25"
+  LANTERN: "3.00"
+  FLOWER_POT: "1.50"
+  CHEST: "2.00"
+  CRAFTING_TABLE: "1.00"
+  ANVIL: "35.00"
+  BREAD: "0.40"
+  COOKED_BEEF: "1.25"
+  BAKED_POTATO: "0.50"
+  PAPER: "0.50"
+  BOOK: "1.50"

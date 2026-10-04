@@ -1,0 +1,96 @@
+name: FBSMP
+version: ${version}
+main: net.firebreadmc.fbsmp.paper.FbsmpPlugin
+api-version: '26.1'
+authors: [FirebreadMC]
+description: Persistent, cross-play survival systems for FB-SMP.
+commands:
+  bal:
+    aliases: [balance]
+    description: Show your ₣฿ balance.
+  baltop:
+    description: Show the richest players.
+  pay:
+    description: Transfer ₣฿ to another player.
+    usage: /pay <player> <amount>
+  sethome:
+    description: Save a home location.
+    usage: /sethome [name]
+  home:
+    description: Teleport to a saved home.
+    usage: /home [name]
+  homes:
+    description: List your homes.
+  delhome:
+    description: Remove a saved home.
+    usage: /delhome <name>
+  warp:
+    description: Open the warp list or teleport to a warp.
+    usage: /warp [name]
+  rtpq:
+    description: Teleport to a safe random location.
+  tpa:
+    description: Request to teleport to a player.
+    usage: /tpa <player>
+  tpahere:
+    description: Request a player to teleport to you.
+    usage: /tpahere <player>
+  tpaccept:
+    description: Accept a teleport request.
+  tpdeny:
+    description: Deny a teleport request.
+  msg:
+    aliases: [tell, w]
+    description: Send a private message.
+    usage: /msg <player> <message>
+  reply:
+    aliases: [r]
+    description: Reply to the last private message.
+  ignore:
+    description: Ignore or unignore a player.
+    usage: /ignore <player>
+  stats:
+    description: Show your FB-SMP statistics.
+  settings:
+    description: View and change your preferences.
+    usage: /settings [scoreboard|notifications|sounds] [on|off]
+  afk:
+    description: Mark yourself as away.
+  sell:
+    description: Open the sell inventory.
+  shop:
+    description: Open the server shop.
+  ah:
+    aliases: [aushop]
+    description: Open the auction house.
+  ausell:
+    description: List an item in the auction house.
+    usage: /ausell <price>
+  loan:
+    description: View loan options or your account.
+    usage: /loan [amount|vu]
+  mort:
+    description: View mortgage options.
+  mortvu:
+    description: View your mortgage account.
+  gift:
+    description: Start a secure item or currency gift.
+    usage: /gift <player> <amount>
+  orders:
+    description: Manage community delivery orders.
+  fbsmp:
+    description: FB-SMP administration and utilities.
+    usage: /fbsmp <version|backup|reload|warp|calendar>
+permissions:
+  fbsmp.admin:
+    description: Use FB-SMP administration commands.
+    default: op
+  fbsmp.homes.unlimited:
+    description: Bypass the normal home limit.
+    default: op
+  fbsmp.moderate:
+    description: Use FB-SMP moderation commands.
+    default: op
+  fbsmp.loan.limit.bypass:
+    description: Bypass loan borrowing limits.
+    default: op

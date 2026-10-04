@@ -1,0 +1,4 @@
+maximum-principal: 1000000.00
+interest-rate-percent: 8.00
+repayment-days: 30
+overdue-fee-percent: 2.00

@@ -1,0 +1,2 @@
+default-timeout-minutes: 10
+maximum-reason-length: 256

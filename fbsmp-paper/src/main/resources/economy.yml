@@ -1,0 +1,5 @@
+currency-symbol: "₣฿"
+decimal-places: 2
+starting-balance: 0
+maximum-transfer: 1000000000
+pay-cooldown-seconds: 2

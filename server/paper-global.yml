@@ -1,0 +1,9 @@
+# Copy to config/paper-global.yml in the Paper server directory.
+# Replace the placeholder with the shared Velocity forwarding secret.
+misc:
+  legacy-ender-pearl-behavior: false
+proxies:
+  velocity:
+    enabled: true
+    online-mode: true
+    secret: "REPLACE_WITH_THE_SHARED_FORWARDING_SECRET"

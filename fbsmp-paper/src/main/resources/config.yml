@@ -1,0 +1,27 @@
+economy:
+  starting-balance: 0
+calendar:
+  day-length-minutes: 30
+  special-month-days: 29
+teleport:
+  request-expiry-seconds: 60
+  cooldown-seconds: 30
+  random:
+    min-radius: 500
+    max-radius: 5000
+homes:
+  default-limit: 3
+  max-name-length: 16
+admin-panel:
+  enabled: true
+  bind-address: 127.0.0.1
+  port: 8765
+afk:
+  inactivity-seconds: 300
+backups:
+  retention-count: 20
+starter-kit:
+  enabled: true
+  # Starter items are intentionally non-combat items; no weapons are included.
+database:
+  file: fbsmp.sqlite

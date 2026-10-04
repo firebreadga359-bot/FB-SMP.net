@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>FB-SMP Control Room</title>
+    <style>
+      :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eaf0f7;background:#0c1118;font-synthesis:none;text-rendering:optimizeLegibility}
+      *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 82% -5%,#25251e 0,transparent 38%),#0c1118}
+      .shell{max-width:1160px;margin:auto;padding:36px 24px}.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #26313d;padding-bottom:24px;margin-bottom:30px}
+      .brand{display:flex;gap:14px;align-items:center}.mark{width:42px;height:42px;border-radius:13px;background:linear-gradient(145deg,#f0bd61,#bd7727);display:grid;place-items:center;color:#20170b;font-weight:900;font-size:19px;box-shadow:0 8px 28px #e0a44b24}
+      h1{font-size:19px;margin:0;letter-spacing:-.03em}.sub{font-size:12px;color:#8d9aaa;margin-top:5px}.status{font-size:12px;color:#79d2a1;display:flex;gap:8px;align-items:center}.dot{width:7px;height:7px;background:#4dc886;border-radius:50%;box-shadow:0 0 0 4px #4dc88622}
+      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.metric,.panel{background:#131b25;border:1px solid #26313d;border-radius:14px}.metric{padding:19px}.metric span{display:block;color:#92a0af;font-size:12px}.metric strong{display:block;font-size:24px;margin-top:14px;letter-spacing:-.04em}.metric em{font-style:normal;font-size:11px;color:#d6a953;display:block;margin-top:6px}
+      .panel{margin-top:18px;padding:20px}.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.panel h2{font-size:14px;margin:0}.muted{color:#8793a0;font-size:12px}.tabs{display:flex;gap:6px;flex-wrap:wrap}.tabs button,.button{border:1px solid #303d4c;background:#18222e;color:#bac6d3;padding:9px 12px;border-radius:8px;font-size:12px;cursor:pointer}.tabs button.active{color:#f3c875;border-color:#98743c;background:#312719}.button.primary{background:#d7a751;color:#1d170c;border-color:#e7b75a;font-weight:700}.button:hover,.tabs button:hover{filter:brightness(1.15)}
+      table{width:100%;border-collapse:collapse;font-size:12px}th{color:#8896a5;text-align:left;font-weight:500;padding:10px;border-bottom:1px solid #2a3542}td{padding:12px 10px;border-bottom:1px solid #202a35;color:#dae1e8}td:last-child,th:last-child{text-align:right}.positive{color:#7fd3a5}.empty{text-align:center;color:#7f8d9c;padding:28px}.login-wrap{max-width:380px;margin:12vh auto}.login-box{padding:26px;background:#131b25;border:1px solid #2b3642;border-radius:16px}.login-box label{display:block;margin:18px 0 8px;color:#a6b3c0;font-size:12px}.login-box input{width:100%;background:#0c121a;color:white;border:1px solid #303d4c;border-radius:8px;padding:12px;font:inherit}.error{color:#f08a83;font-size:12px;min-height:18px;margin-top:10px}.hidden{display:none!important}.foot{color:#738090;font-size:11px;padding-top:18px}.action-row{display:flex;gap:8px}
+      @media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.shell{padding:22px 14px}.metric strong{font-size:20px}}@media(max-width:420px){.grid{grid-template-columns:1fr 1fr;gap:8px}.metric{padding:14px}.top{align-items:flex-start}}
+    </style>
+  </head>
+  <body>
+    <main id="login" class="login-wrap">
+      <div class="brand" style="margin-bottom:18px"><div class="mark">F</div><div><h1>FB-SMP Control Room</h1><div class="sub">Private server administration</div></div></div>
+      <form id="login-form" class="login-box">
+        <h2 style="margin:0;font-size:17px">Sign in</h2><p class="muted">Enter the local panel access token from the plugin data folder.</p>
+        <label for="token">Admin access token</label><input id="token" type="password" autocomplete="current-password" required minlength="32">
+        <div class="error" id="login-error"></div><button class="button primary" style="width:100%;margin-top:10px">Open control room</button>
+      </form>
+      <div class="foot">This panel accepts local connections only.</div>
+    </main>
+    <main id="app" class="shell hidden">
+      <header class="top"><div class="brand"><div class="mark">F</div><div><h1>FB-SMP Control Room</h1><div class="sub" id="version">Paper survival network</div></div></div><div class="action-row"><span class="status"><i class="dot"></i> Backend online</span><button id="logout" class="button">Sign out</button></div></header>
+      <section class="grid">
+        <div class="metric"><span>Player records</span><strong id="players">—</strong><em>Persistent profiles</em></div>
+        <div class="metric"><span>Currency in circulation</span><strong id="balance">—</strong><em>₣฿ economy total</em></div>
+        <div class="metric"><span>Transactions</span><strong id="transactions-count">—</strong><em>Recorded economy events</em></div>
+        <div class="metric"><span>Server time</span><strong id="time" style="font-size:17px">—</strong><em id="uptime">Paper backend</em></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><h2>Server records</h2><div class="muted" style="margin-top:5px">Read-only player and economy data</div></div><div class="action-row"><div class="tabs"><button id="tab-players" class="active">Player balances</button><button id="tab-transactions">Transactions</button></div><button id="backup" class="button primary">Create backup</button></div></div>
+        <div id="table"></div>
+      </section>
+      <div class="foot">Admin HTTP service is bound to 127.0.0.1. Do not forward port 8765 to the public internet.</div>
+    </main>
+    <script>
+      let csrfToken = "";
+      let currentTab = "players";
+      const $ = (id) => document.getElementById(id);
+      async function api(path, options = {}) {
+        const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+        if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
+        const response = await fetch(path, { credentials: "same-origin", ...options, headers });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || "Request failed");
+        return body;
+      }
+      function showApp() { $("login").classList.add("hidden"); $("app").classList.remove("hidden"); refresh(); }
+      async function restoreSession() {
+        try { const session = await api("/api/session"); csrfToken = session.csrfToken; showApp(); }
+        catch { $("login").classList.remove("hidden"); $("app").classList.add("hidden"); }
+      }
+      $("login-form").addEventListener("submit", async (event) => {
+        event.preventDefault(); $("login-error").textContent = "";
+        try { const result = await api("/api/login", { method:"POST", body:JSON.stringify({token:$("token").value}) }); csrfToken=result.csrfToken; $("token").value=""; showApp(); }
+        catch (error) { $("login-error").textContent=error.message; }
+      });
+      $("logout").addEventListener("click", async () => { try { await api("/api/logout",{method:"POST",body:"{}"}); } finally { csrfToken=""; location.reload(); } });
+      $("backup").addEventListener("click", async () => { try { const result=await api("/api/backup",{method:"POST",body:"{}"}); alert(result.message); } catch(error) { alert(error.message); } });
+      $("tab-players").addEventListener("click",()=>selectTab("players"));
+      $("tab-transactions").addEventListener("click",()=>selectTab("transactions"));
+      function selectTab(tab) { currentTab=tab; $("tab-players").classList.toggle("active",tab==="players"); $("tab-transactions").classList.toggle("active",tab==="transactions"); loadTable(); }
+      async function refresh() {
+        try {
+          const data=await api("/api/status");
+          $("version").textContent="Paper "+data.version;
+          $("players").textContent=Number(data.playerRecords).toLocaleString();
+          $("balance").textContent=data.totalBalance;
+          $("transactions-count").textContent=Number(data.transactionCount).toLocaleString();
+          $("time").textContent=new Date(data.serverTime).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+          $("uptime").textContent="Server status: "+data.status;
+          await loadTable();
+        } catch(error) { if(error.message==="Sign in to continue.") restoreSession(); }
+      }
+      async function loadTable() {
+        const root=$("table"); root.innerHTML='<div class="empty">Loading records…</div>';
+        try {
+          if(currentTab==="players") {
+            const rows=await api("/api/players");
+            root.innerHTML=rows.length?'<table><thead><tr><th>Player</th><th>Balance</th></tr></thead><tbody>'+rows.map(row=>'<tr><td>'+escapeHtml(row.name)+'</td><td class="positive">'+escapeHtml(row.formattedBalance)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No player records yet.</div>';
+          } else {
+            const rows=await api("/api/transactions");
+            root.innerHTML=rows.length?'<table><thead><tr><th>Type</th><th>Sender</th><th>Recipient</th><th>Amount</th><th>Time</th></tr></thead><tbody>'+rows.map(row=>'<tr><td>'+escapeHtml(row.type)+'</td><td>'+escapeHtml(row.senderUuid||"System")+'</td><td>'+escapeHtml(row.receiverUuid)+'</td><td class="positive">₣฿'+(row.amountMinor/100).toFixed(2)+'</td><td>'+new Date(row.createdAt).toLocaleString()+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No transactions recorded yet.</div>';
+          }
+        } catch(error) { root.innerHTML='<div class="empty">'+escapeHtml(error.message)+'</div>'; }
+      }
+      function escapeHtml(value) { return String(value).replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character])); }
+      restoreSession();
+      setInterval(refresh, 30000);
+    </script>
+  </body>
+</html>

@@ -47,3 +47,23 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Java / Gradle server project
+.gradle/
+build/
+**/build/
+run/
+server/world/
+server/world_nether/
+server/world_the_end/
+server/plugins/
+server/velocity/forwarding.secret
+server/velocity/secret.key
+server/admin-token
+server/backups/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+*.jar
+!gradle/wrapper/gradle-wrapper.jar

@@ -1,0 +1,39 @@
+config-version = "2.7"
+bind = "0.0.0.0:25565"
+motd = "<#e0a44b>FB-SMP <gray>| <white>Java + Bedrock survival"
+show-max-players = 100
+online-mode = true
+force-key-authentication = true
+prevent-client-proxy-connections = false
+player-info-forwarding-mode = "modern"
+forwarding-secret-file = "forwarding.secret"
+announce-forge = false
+kick-existing-players = false
+ping-passthrough = "DISABLED"
+sample-players-in-ping = false
+enable-player-address-logging = false
+
+[servers]
+paper = "127.0.0.1:25566"
+try = ["paper"]
+
+[forced-hosts]
+
+[advanced]
+compression-threshold = 256
+compression-level = -1
+login-ratelimit = 3000
+connection-timeout = 5000
+read-timeout = 30000
+haproxy-protocol = false
+tcp-fast-open = false
+bungee-plugin-message-channel = true
+show-ping-requests = false
+failover-on-unexpected-server-disconnect = true
+announce-proxy-commands = true
+log-command-executions = false
+log-player-connections = true
+accepts-transfers = false
+enable-reuse-port = false
+#
+# Bind the proxy publicly. Keep the Paper backend bound to 127.0.0.1.

@@ -1,0 +1,3 @@
+default-limit: 3
+world-limits:
+  world: 3

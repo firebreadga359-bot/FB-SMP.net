@@ -1,0 +1,5 @@
+defaults:
+  scoreboard: true
+  notifications: true
+  sounds: true
+  auto-afk: true

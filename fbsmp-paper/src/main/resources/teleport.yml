@@ -1,0 +1,7 @@
+request-expiry-seconds: 60
+cooldown-seconds: 30
+delay-seconds: 3
+movement-cancels-delay: true
+random:
+  min-radius: 500
+  max-radius: 5000

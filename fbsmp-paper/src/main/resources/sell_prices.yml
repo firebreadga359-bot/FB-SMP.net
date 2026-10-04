@@ -1,0 +1,11 @@
+# Values are in ₣฿; only materials listed here can be sold.
+prices:
+  COBBLESTONE: 0.15
+  STONE: 0.25
+  OAK_LOG: 1.00
+  WHEAT: 0.40
+  CARROT: 0.35
+  POTATO: 0.35
+  IRON_INGOT: 4.00
+  GOLD_INGOT: 6.00
+  COAL: 1.25

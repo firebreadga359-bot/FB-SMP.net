@@ -1,0 +1,15 @@
+# For the Geyser-Velocity plugin. Keep the Bedrock listener on UDP 19132.
+bedrock:
+  address: 0.0.0.0
+  port: 19132
+  clone-remote-port: false
+  motd1: FB-SMP
+  motd2: Java + Bedrock survival
+  server-name: FB-SMP
+remote:
+  address: auto
+  port: 25565
+  auth-type: floodgate
+  use-proxy-protocol: false
+floodgate-key-file: key.pem
+debug-mode: false
