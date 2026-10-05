@@ -7,6 +7,10 @@ import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
 import net.firebreadmc.fbsmp.paper.menus.SellMenu;
 import net.firebreadmc.fbsmp.paper.menus.ShopMenu;
+import net.firebreadmc.fbsmp.paper.menus.MortgageMenu;
+import net.firebreadmc.fbsmp.paper.menus.WarpMenu;
+import net.firebreadmc.fbsmp.paper.menus.SettingsMenu;
+import net.firebreadmc.fbsmp.paper.menus.AuctionMenu;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -52,14 +56,23 @@ public final class CommandRouter implements CommandExecutor {
     private final PlayerListener listener;
     private final SellMenu sellMenu;
     private final ShopMenu shopMenu;
+    private final MortgageMenu mortgageMenu;
+    private final WarpMenu warpMenu;
+    private final SettingsMenu settingsMenu;
+    private final AuctionMenu auctionMenu;
 
     public CommandRouter(FbsmpPlugin plugin, FbsmpDatabase database, PlayerListener listener,
-                         SellMenu sellMenu, ShopMenu shopMenu) {
+                         SellMenu sellMenu, ShopMenu shopMenu, MortgageMenu mortgageMenu,
+                         WarpMenu warpMenu, SettingsMenu settingsMenu, AuctionMenu auctionMenu) {
         this.plugin = plugin;
         this.database = database;
         this.listener = listener;
         this.sellMenu = sellMenu;
         this.shopMenu = shopMenu;
+        this.mortgageMenu = mortgageMenu;
+        this.warpMenu = warpMenu;
+        this.settingsMenu = settingsMenu;
+        this.auctionMenu = auctionMenu;
     }
 
     @Override
@@ -156,8 +169,8 @@ public final class CommandRouter implements CommandExecutor {
                     }
                     target.sendMessage(color("&aSent &6" + Money.format(amount) + " &ato " + recipient.getName() + "."));
                     if (recipient.isOnline()) {
-                        recipient.sendMessage(color("&aReceived &6" + Money.format(amount) + " &afrom "
-                                + target.getName() + "."));
+                        listener.notifySystem(recipient, color("&aReceived &6" + Money.format(amount) + " &afrom "
+                                + target.getName() + "."), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
                     }
                 });
     }
@@ -229,16 +242,11 @@ public final class CommandRouter implements CommandExecutor {
 
     private void warp(CommandSender sender, String[] args) {
         if (args.length == 0) {
-            query(sender, () -> database.warp("spawn"), (target, saved) -> {
-                if (sender instanceof Player player && saved.isPresent()) {
-                    teleportToSaved(player, saved.get());
-                } else if (sender instanceof Player) {
-                    target.sendMessage(color("&7No public warp exists yet. An admin can create one with "
-                            + "&f/fbsmp warp create spawn&7."));
-                } else {
-                    target.sendMessage(color("&7Warps are available in-game."));
-                }
-            });
+            if (sender instanceof Player player) {
+                warpMenu.open(player);
+            } else {
+                sender.sendMessage(color("&7Warps are available in-game."));
+            }
             return;
         }
         if (!(sender instanceof Player player)) {
@@ -304,9 +312,10 @@ public final class CommandRouter implements CommandExecutor {
                 + Math.max(10, plugin.getConfig().getInt("teleport.request-expiry-seconds", 60)) * 1000L;
         requestsByRecipient.put(recipient.getUniqueId(),
                 new TeleportRequest(requester.getUniqueId(), recipient.getUniqueId(), here, expiresAt));
-        recipient.sendMessage(color("&e" + requester.getName() + (here
+        listener.notifySystem(recipient, color("&e" + requester.getName() + (here
                 ? " asks you to teleport to them. Use /tpaccept or /tpdeny."
-                : " asks to teleport to you. Use /tpaccept or /tpdeny.")));
+                : " asks to teleport to you. Use /tpaccept or /tpdeny.")),
+                org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING);
         requester.sendMessage(color("&aTeleport request sent to " + recipient.getName() + "."));
     }
 
@@ -473,6 +482,9 @@ public final class CommandRouter implements CommandExecutor {
             target.sendMessage(color("&7Blocks placed/broken: &f" + display.stats.blocksPlaced() + "/"
                     + display.stats.blocksBroken()));
             target.sendMessage(color("&7Deaths: &f" + display.stats.deaths() + " &8| &7Date: &f" + display.date));
+            target.sendMessage(color("&7Economy events: &f" + display.stats.transactions()
+                    + " &8| &7Auction trades: &f" + display.stats.auctionTrades()
+                    + " &8| &7Orders: &f" + display.stats.orderTrades()));
         });
     }
 
@@ -482,13 +494,7 @@ public final class CommandRouter implements CommandExecutor {
             return;
         }
         if (args.length == 0) {
-            query(player, () -> Map.of(
-                    "scoreboard", database.setting(player.getUniqueId(), "scoreboard", "true"),
-                    "notifications", database.setting(player.getUniqueId(), "notifications", "true"),
-                    "sounds", database.setting(player.getUniqueId(), "sounds", "true")
-            ), (target, values) -> target.sendMessage(color("&6Settings: &fscoreboard=" + values.get("scoreboard")
-                    + " &7| &fnotifications=" + values.get("notifications") + " &7| &fsounds=" + values.get("sounds")
-                    + "&7. Use /settings <key> <on|off>.")));
+            settingsMenu.open(player);
             return;
         }
         if (args.length != 2 || !List.of("scoreboard", "notifications", "sounds").contains(args[0].toLowerCase(Locale.ROOT))
@@ -498,10 +504,10 @@ public final class CommandRouter implements CommandExecutor {
         }
         String key = args[0].toLowerCase(Locale.ROOT);
         String value = Boolean.toString(args[1].equalsIgnoreCase("on"));
-        query(player, () -> {
-            database.setSetting(player.getUniqueId(), key, value, System.currentTimeMillis());
-            return true;
-        }, (target, ignored) -> target.sendMessage(color("&a" + key + " set to " + args[1].toLowerCase(Locale.ROOT) + ".")));
+        listener.setPreference(player, key, Boolean.parseBoolean(value), success ->
+                player.sendMessage(color(success
+                        ? "&a" + key + " set to " + args[1].toLowerCase(Locale.ROOT) + "."
+                        : "&cCould not save that setting.")));
     }
 
     private void afk(CommandSender sender) {
@@ -614,6 +620,14 @@ public final class CommandRouter implements CommandExecutor {
                     target.sendMessage(color(cancelled ? "&aListing cancelled; item returned by player mail."
                             : "&cYou cannot cancel that listing."));
                 });
+            }
+            return;
+        }
+        if (args.length == 0) {
+            if (sender instanceof Player player) {
+                auctionMenu.open(player);
+            } else {
+                sender.sendMessage(color("&7Auction listings are available in-game."));
             }
             return;
         }
@@ -774,16 +788,7 @@ public final class CommandRouter implements CommandExecutor {
         }
         YamlConfiguration config = featureConfig("mortgages");
         if (args.length == 0) {
-            ConfigurationSection properties = config.getConfigurationSection("available-properties");
-            if (properties == null || properties.getKeys(false).isEmpty()) {
-                player.sendMessage(color("&7No mortgage assets are configured. Add assets to mortgages.yml."));
-            } else {
-                player.sendMessage(color("&6Mortgage assets &8— &7Use &f/mort buy <asset>"));
-                for (String key : properties.getKeys(false)) {
-                    player.sendMessage(color("&f" + key + " &8— &6" + properties.getString(key)));
-                }
-            }
-            player.sendMessage(color("&7Use &f/mort pay &7for a due installment."));
+            mortgageMenu.open(player);
             return;
         }
         if (args[0].equalsIgnoreCase("pay") && args.length == 1) {
@@ -1183,11 +1188,50 @@ public final class CommandRouter implements CommandExecutor {
                 plugin.reloadConfig();
                 sender.sendMessage(color("&aFB-SMP config.yml reloaded."));
             }
-            case "debug" -> sender.sendMessage(color("&7Database: &fSQLite &8| &7Player records: &f"
-                    + Bukkit.getOnlinePlayers().size() + " online"));
+            case "debug", "database" -> query(sender, database::adminSnapshot, (target, snapshot) ->
+                    target.sendMessage(color("&7SQLite database &8| &f" + snapshot.playerCount()
+                            + " player records &8| &f" + snapshot.transactionCount() + " transactions &8| &f"
+                            + Money.format(snapshot.totalBalanceMinor()) + " total balance")));
+            case "player" -> adminPlayer(sender, args, false);
+            case "economy" -> adminPlayer(sender, args, true);
             case "warp" -> adminWarp(sender, args);
-            default -> sender.sendMessage(color("&7Usage: /fbsmp <version|backup|reload|debug|calendar|warp>"));
+            default -> sender.sendMessage(color("&7Usage: /fbsmp <version|backup|reload|debug|database|player|economy|calendar|warp>"));
         }
+    }
+
+    private void adminPlayer(CommandSender sender, String[] args, boolean economyOnly) {
+        if (args.length != 2 || !validName(args[1], 16)) {
+            sender.sendMessage(color(economyOnly
+                    ? "&cUsage: /fbsmp economy <player>"
+                    : "&cUsage: /fbsmp player <player>"));
+            return;
+        }
+        String playerName = args[1];
+        Player online = Bukkit.getPlayerExact(playerName);
+        query(sender, () -> online == null ? database.playerUuidByName(playerName)
+                        : Optional.of(online.getUniqueId()),
+                (target, playerId) -> {
+                    if (playerId.isEmpty()) {
+                        target.sendMessage(color("&cNo stored player named &f" + playerName + "&c."));
+                        return;
+                    }
+                    if (economyOnly) {
+                        query(target, () -> database.balance(playerId.get()), (resultTarget, amount) ->
+                                resultTarget.sendMessage(color("&6" + playerName + "'s balance: &f"
+                                        + Money.format(amount))));
+                    } else {
+                        query(target, () -> database.stats(playerId.get()), (resultTarget, stats) -> {
+                            resultTarget.sendMessage(color("&6Player record: &f" + playerName));
+                            resultTarget.sendMessage(color("&7Balance: &6" + Money.format(stats.balanceMinor())
+                                    + " &8| &7Playtime: &f" + stats.playtimeSeconds() / 3600 + "h"));
+                            resultTarget.sendMessage(color("&7Blocks: &f" + stats.blocksPlaced() + " placed / "
+                                    + stats.blocksBroken() + " broken &8| &7Deaths: &f" + stats.deaths()));
+                            resultTarget.sendMessage(color("&7Economy events: &f" + stats.transactions()
+                                    + " &8| &7Auction trades: &f" + stats.auctionTrades()
+                                    + " &8| &7Order trades: &f" + stats.orderTrades()));
+                        });
+                    }
+                });
     }
 
     private void moderate(CommandSender sender, String[] args, String action) {
@@ -1196,11 +1240,11 @@ public final class CommandRouter implements CommandExecutor {
             return;
         }
         boolean isKick = action.equals("KICK");
-        if (args.length < (action.equals("TIMEOUT") ? 2 : 1)) {
+        if (args.length < 1) {
             sender.sendMessage(color(switch (action) {
                 case "BAN" -> "&cUsage: /ban <player> [duration|permanent] [reason]";
                 case "KICK" -> "&cUsage: /kick <online-player> [reason]";
-                default -> "&cUsage: /timeout <player> <duration> [reason]";
+                default -> "&cUsage: /timeout <player> [duration] [reason]";
             }));
             return;
         }
@@ -1226,13 +1270,24 @@ public final class CommandRouter implements CommandExecutor {
                 reasonIndex = 1;
             }
         } else if (action.equals("TIMEOUT")) {
-            try {
-                expiresAt = durationExpiration(args[1], System.currentTimeMillis());
-            } catch (IllegalArgumentException exception) {
-                sender.sendMessage(color("&c" + exception.getMessage()));
-                return;
+            if (args.length > 1 && isDuration(args[1])) {
+                try {
+                    expiresAt = durationExpiration(args[1], System.currentTimeMillis());
+                } catch (IllegalArgumentException exception) {
+                    sender.sendMessage(color("&c" + exception.getMessage()));
+                    return;
+                }
+                reasonIndex = 2;
+            } else {
+                int minutes = Math.max(1, featureConfig("moderation").getInt("default-timeout-minutes", 10));
+                try {
+                    expiresAt = durationExpiration(minutes + "m", System.currentTimeMillis());
+                } catch (IllegalArgumentException exception) {
+                    sender.sendMessage(color("&c" + exception.getMessage()));
+                    return;
+                }
+                reasonIndex = 1;
             }
-            reasonIndex = 2;
         } else {
             reasonIndex = 1;
         }

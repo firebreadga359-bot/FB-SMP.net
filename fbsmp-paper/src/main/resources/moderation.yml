@@ -1,2 +1,3 @@
 default-timeout-minutes: 10
 maximum-reason-length: 256
+maximum-duration-days: 3650

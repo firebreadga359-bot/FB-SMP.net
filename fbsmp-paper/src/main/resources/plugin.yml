@@ -78,6 +78,18 @@ commands:
     usage: /gift <player> <amount>
   orders:
     description: Manage community delivery orders.
+  ban:
+    description: Record a persistent player ban.
+    usage: /ban <player> [duration|permanent] [reason]
+    permission: fbsmp.moderate
+  kick:
+    description: Record a player kick.
+    usage: /kick <online-player> [reason]
+    permission: fbsmp.moderate
+  timeout:
+    description: Temporarily mute a player in public chat.
+    usage: /timeout <player> [duration] [reason]
+    permission: fbsmp.moderate
   fbsmp:
     description: FB-SMP administration and utilities.
     usage: /fbsmp <version|backup|reload|warp|calendar>

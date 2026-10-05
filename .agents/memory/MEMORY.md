@@ -1,0 +1,1 @@
+- [JUnit 5 on Paper](paper-junit-platform.md) — Paper test tasks need JUnit Platform enabled and a Jupiter engine to execute JUnit 5 tests.

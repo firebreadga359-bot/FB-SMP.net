@@ -218,6 +218,18 @@ public final class FbsmpDatabase implements AutoCloseable {
         }
     }
 
+    public Optional<UUID> playerUuidByName(String playerName) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT uuid FROM players WHERE last_name = ? COLLATE NOCASE LIMIT 1")) {
+                statement.setString(1, playerName);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? Optional.of(UUID.fromString(result.getString(1))) : Optional.empty();
+                }
+            }
+        }
+    }
+
     public boolean claimStarterKit(UUID playerId) throws SQLException {
         synchronized (lock) {
             boolean previousAutoCommit = connection.getAutoCommit();
@@ -341,6 +353,26 @@ public final class FbsmpDatabase implements AutoCloseable {
         }
     }
 
+    public List<SavedLocation> warps(int limit) throws SQLException {
+        synchronized (lock) {
+            List<SavedLocation> locations = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT name, world, x, y, z, yaw, pitch FROM warps
+                    ORDER BY name COLLATE NOCASE LIMIT ?
+                    """)) {
+                statement.setInt(1, Math.max(1, Math.min(100, limit)));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        locations.add(new SavedLocation(result.getString(1), result.getString(2),
+                                result.getDouble(3), result.getDouble(4), result.getDouble(5),
+                                result.getFloat(6), result.getFloat(7)));
+                    }
+                }
+            }
+            return locations;
+        }
+    }
+
     public void setSetting(UUID playerId, String key, String value, long now) throws SQLException {
         synchronized (lock) {
             try (PreparedStatement statement = connection.prepareStatement("""
@@ -414,16 +446,23 @@ public final class FbsmpDatabase implements AutoCloseable {
     public PlayerStats stats(UUID playerId) throws SQLException {
         synchronized (lock) {
             try (PreparedStatement statement = connection.prepareStatement("""
-                    SELECT balance_minor, playtime_seconds, blocks_placed, blocks_broken, deaths, last_seen_at
+                    SELECT balance_minor, playtime_seconds, blocks_placed, blocks_broken, deaths, last_seen_at,
+                           (SELECT COUNT(*) FROM economy_transactions e
+                            WHERE e.sender_uuid = players.uuid OR e.receiver_uuid = players.uuid),
+                           (SELECT COUNT(*) FROM auctions a
+                            WHERE a.seller_uuid = players.uuid OR a.buyer_uuid = players.uuid),
+                           (SELECT COUNT(*) FROM community_orders o
+                            WHERE o.requester_uuid = players.uuid OR o.claimer_uuid = players.uuid)
                     FROM players WHERE uuid = ?
                     """)) {
                 statement.setString(1, playerId.toString());
                 try (ResultSet result = statement.executeQuery()) {
                     if (!result.next()) {
-                        return new PlayerStats(0, 0, 0, 0, 0, 0);
+                        return new PlayerStats(0, 0, 0, 0, 0, 0, 0, 0, 0);
                     }
                     return new PlayerStats(result.getLong(1), result.getLong(2), result.getLong(3),
-                            result.getLong(4), result.getLong(5), result.getLong(6));
+                            result.getLong(4), result.getLong(5), result.getLong(6), result.getLong(7),
+                            result.getLong(8), result.getLong(9));
                 }
             }
         }
@@ -1084,15 +1123,20 @@ public final class FbsmpDatabase implements AutoCloseable {
     }
 
     public List<AuctionListing> openAuctions(long now, int limit) throws SQLException {
+        return openAuctions(now, limit, 0);
+    }
+
+    public List<AuctionListing> openAuctions(long now, int limit, int offset) throws SQLException {
         synchronized (lock) {
             List<AuctionListing> listings = new ArrayList<>();
             try (PreparedStatement statement = connection.prepareStatement("""
                     SELECT id, seller_uuid, item_data, quantity, price_minor, expires_at
                     FROM auctions WHERE status = 'OPEN' AND expires_at > ?
-                    ORDER BY created_at DESC LIMIT ?
+                    ORDER BY created_at DESC LIMIT ? OFFSET ?
                     """)) {
                 statement.setLong(1, now);
                 statement.setInt(2, Math.max(1, Math.min(100, limit)));
+                statement.setInt(3, Math.max(0, offset));
                 try (ResultSet result = statement.executeQuery()) {
                     while (result.next()) {
                         listings.add(new AuctionListing(result.getLong(1), UUID.fromString(result.getString(2)),
@@ -1960,6 +2004,122 @@ public final class FbsmpDatabase implements AutoCloseable {
         }
     }
 
+    public List<AdminLoanRow> adminLoans(int limit) throws SQLException {
+        synchronized (lock) {
+            List<AdminLoanRow> rows = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT l.id, COALESCE(p.last_name, l.player_uuid), l.remaining_minor, l.due_at, l.status
+                    FROM loans l LEFT JOIN players p ON p.uuid = l.player_uuid
+                    ORDER BY l.created_at DESC LIMIT ?
+                    """)) {
+                statement.setInt(1, Math.max(1, Math.min(100, limit)));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        rows.add(new AdminLoanRow(result.getLong(1), result.getString(2),
+                                result.getLong(3), result.getLong(4), result.getString(5)));
+                    }
+                }
+            }
+            return rows;
+        }
+    }
+
+    public List<AdminMortgageRow> adminMortgages(int limit) throws SQLException {
+        synchronized (lock) {
+            List<AdminMortgageRow> rows = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT m.id, COALESCE(p.last_name, m.player_uuid), m.asset_key, m.remaining_minor,
+                           m.installments_left, m.next_due_at, m.status
+                    FROM mortgages m LEFT JOIN players p ON p.uuid = m.player_uuid
+                    ORDER BY m.created_at DESC LIMIT ?
+                    """)) {
+                statement.setInt(1, Math.max(1, Math.min(100, limit)));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        rows.add(new AdminMortgageRow(result.getLong(1), result.getString(2),
+                                result.getString(3), result.getLong(4), result.getInt(5),
+                                result.getLong(6), result.getString(7)));
+                    }
+                }
+            }
+            return rows;
+        }
+    }
+
+    public List<AdminAuctionRow> adminAuctions(int limit) throws SQLException {
+        synchronized (lock) {
+            List<AdminAuctionRow> rows = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT a.id, COALESCE(p.last_name, a.seller_uuid), a.quantity, a.price_minor,
+                           a.status, a.expires_at
+                    FROM auctions a LEFT JOIN players p ON p.uuid = a.seller_uuid
+                    ORDER BY a.created_at DESC LIMIT ?
+                    """)) {
+                statement.setInt(1, Math.max(1, Math.min(100, limit)));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        rows.add(new AdminAuctionRow(result.getLong(1), result.getString(2),
+                                result.getInt(3), result.getLong(4), result.getString(5), result.getLong(6)));
+                    }
+                }
+            }
+            return rows;
+        }
+    }
+
+    public List<AdminOrderRow> adminOrders(int limit) throws SQLException {
+        synchronized (lock) {
+            List<AdminOrderRow> rows = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT o.id, COALESCE(requester.last_name, o.requester_uuid),
+                           COALESCE(claimer.last_name, o.claimer_uuid, ''), o.item_key, o.quantity,
+                           o.reward_minor, o.status, o.expires_at
+                    FROM community_orders o
+                    LEFT JOIN players requester ON requester.uuid = o.requester_uuid
+                    LEFT JOIN players claimer ON claimer.uuid = o.claimer_uuid
+                    ORDER BY o.created_at DESC LIMIT ?
+                    """)) {
+                statement.setInt(1, Math.max(1, Math.min(100, limit)));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        rows.add(new AdminOrderRow(result.getLong(1), result.getString(2),
+                                result.getString(3), result.getString(4), result.getInt(5),
+                                result.getLong(6), result.getString(7), result.getLong(8)));
+                    }
+                }
+            }
+            return rows;
+        }
+    }
+
+    public List<AuditEvent> recentAuditEvents(int limit) throws SQLException {
+        synchronized (lock) {
+            List<AuditEvent> rows = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT event_type, detail, created_at FROM (
+                        SELECT transaction_type AS event_type,
+                               transaction_type || ': ' || description AS detail,
+                               created_at
+                        FROM economy_transactions
+                        UNION ALL
+                        SELECT action AS event_type,
+                               action || ': ' || reason || ' (player ' || player_uuid || ')' AS detail,
+                               created_at
+                        FROM moderation_records
+                    )
+                    ORDER BY created_at DESC LIMIT ?
+                    """)) {
+                statement.setInt(1, Math.max(1, Math.min(100, limit)));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        rows.add(new AuditEvent(result.getString(1), result.getString(2), result.getLong(3)));
+                    }
+                }
+            }
+            return rows;
+        }
+    }
+
     private Optional<SavedLocation> location(String sql, String... parameters) throws SQLException {
         synchronized (lock) {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -2006,11 +2166,20 @@ public final class FbsmpDatabase implements AutoCloseable {
 
     public record SavedLocation(String name, String world, double x, double y, double z, float yaw, float pitch) {}
     public record PlayerStats(long balanceMinor, long playtimeSeconds, long blocksPlaced,
-                              long blocksBroken, long deaths, long lastSeenAt) {}
+                              long blocksBroken, long deaths, long lastSeenAt, long transactions,
+                              long auctionTrades, long orderTrades) {}
     public record AdminSnapshot(long playerCount, long totalBalanceMinor, long transactionCount) {}
     public record TransactionRow(String senderUuid, String receiverUuid, long amountMinor,
                                  String type, long createdAt) {}
     public record ModerationEntry(UUID player, String action, String reason, Long expiresAt, long createdAt) {}
+    public record AdminLoanRow(long id, String playerName, long remainingMinor, long dueAt, String status) {}
+    public record AdminMortgageRow(long id, String playerName, String assetKey, long remainingMinor,
+                                   int installmentsLeft, long nextDueAt, String status) {}
+    public record AdminAuctionRow(long id, String sellerName, int quantity, long priceMinor,
+                                  String status, long expiresAt) {}
+    public record AdminOrderRow(long id, String requester, String claimer, String itemKey, int quantity,
+                                long rewardMinor, String status, long expiresAt) {}
+    public record AuditEvent(String type, String detail, long createdAt) {}
     public record LoanSummary(int activeCount, long outstandingMinor, long nearestDueAt) {}
     public record AuctionListing(long id, UUID seller, String itemData, int quantity,
                                  long priceMinor, long expiresAt) {}

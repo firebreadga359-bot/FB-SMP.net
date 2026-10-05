@@ -36,7 +36,13 @@
         <div class="metric"><span>Server time</span><strong id="time" style="font-size:17px">—</strong><em id="uptime">Paper backend</em></div>
       </section>
       <section class="panel">
-        <div class="panel-head"><div><h2>Server records</h2><div class="muted" style="margin-top:5px">Read-only player and economy data</div></div><div class="action-row"><div class="tabs"><button id="tab-players" class="active">Player balances</button><button id="tab-transactions">Transactions</button></div><button id="backup" class="button primary">Create backup</button></div></div>
+        <div class="panel-head"><div><h2>Server records</h2><div class="muted" style="margin-top:5px">Read-only operations data, structured logs and backup status</div></div><div class="action-row"><div class="tabs">
+          <button class="tab-button active" data-tab="players">Players</button><button class="tab-button" data-tab="transactions">Transactions</button>
+          <button class="tab-button" data-tab="loans">Loans</button><button class="tab-button" data-tab="mortgages">Mortgages</button>
+          <button class="tab-button" data-tab="auctions">Auctions</button><button class="tab-button" data-tab="orders">Orders</button>
+          <button class="tab-button" data-tab="moderation">Moderation</button><button class="tab-button" data-tab="logs">Audit log</button>
+          <button class="tab-button" data-tab="backups">Backups</button><button class="tab-button" data-tab="config">Configuration</button>
+        </div><button id="backup" class="button primary">Create backup</button></div></div>
         <div id="table"></div>
       </section>
       <div class="foot">Admin HTTP service is bound to 127.0.0.1. Do not forward port 8765 to the public internet.</div>
@@ -65,9 +71,8 @@
       });
       $("logout").addEventListener("click", async () => { try { await api("/api/logout",{method:"POST",body:"{}"}); } finally { csrfToken=""; location.reload(); } });
       $("backup").addEventListener("click", async () => { try { const result=await api("/api/backup",{method:"POST",body:"{}"}); alert(result.message); } catch(error) { alert(error.message); } });
-      $("tab-players").addEventListener("click",()=>selectTab("players"));
-      $("tab-transactions").addEventListener("click",()=>selectTab("transactions"));
-      function selectTab(tab) { currentTab=tab; $("tab-players").classList.toggle("active",tab==="players"); $("tab-transactions").classList.toggle("active",tab==="transactions"); loadTable(); }
+      document.querySelectorAll(".tab-button").forEach(button=>button.addEventListener("click",()=>selectTab(button.dataset.tab)));
+      function selectTab(tab) { currentTab=tab; document.querySelectorAll(".tab-button").forEach(button=>button.classList.toggle("active",button.dataset.tab===tab)); loadTable(); }
       async function refresh() {
         try {
           const data=await api("/api/status");
@@ -76,7 +81,10 @@
           $("balance").textContent=data.totalBalance;
           $("transactions-count").textContent=Number(data.transactionCount).toLocaleString();
           $("time").textContent=new Date(data.serverTime).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
-          $("uptime").textContent="Server status: "+data.status;
+          const uptimeSeconds=Number(data.uptimeSeconds)||0;
+          const uptimeHours=Math.floor(uptimeSeconds/3600);
+          const uptimeMinutes=Math.floor((uptimeSeconds%3600)/60);
+          $("uptime").textContent=`${data.onlinePlayers}/${data.maximumPlayers} online · uptime ${uptimeHours}h ${uptimeMinutes}m · ${Math.round(Number(data.heapUsedBytes)/1048576)} MB heap`;
           await loadTable();
         } catch(error) { if(error.message==="Sign in to continue.") restoreSession(); }
       }
@@ -87,10 +95,33 @@
             const rows=await api("/api/players");
             root.innerHTML=rows.length?'<table><thead><tr><th>Player</th><th>Balance</th></tr></thead><tbody>'+rows.map(row=>'<tr><td>'+escapeHtml(row.name)+'</td><td class="positive">'+escapeHtml(row.formattedBalance)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No player records yet.</div>';
           } else {
-            const rows=await api("/api/transactions");
-            root.innerHTML=rows.length?'<table><thead><tr><th>Type</th><th>Sender</th><th>Recipient</th><th>Amount</th><th>Time</th></tr></thead><tbody>'+rows.map(row=>'<tr><td>'+escapeHtml(row.type)+'</td><td>'+escapeHtml(row.senderUuid||"System")+'</td><td>'+escapeHtml(row.receiverUuid)+'</td><td class="positive">₣฿'+(row.amountMinor/100).toFixed(2)+'</td><td>'+new Date(row.createdAt).toLocaleString()+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No transactions recorded yet.</div>';
+            const tables={
+              transactions:{path:"/api/transactions",columns:[["Type","type"],["Sender","senderUuid"],["Recipient","receiverUuid"],["Amount","amountMinor"],["Time","createdAt"]]},
+              loans:{path:"/api/loans",columns:[["ID","id"],["Player","playerName"],["Remaining","remainingMinor"],["Due","dueAt"],["Status","status"]]},
+              mortgages:{path:"/api/mortgages",columns:[["ID","id"],["Player","playerName"],["Asset","assetKey"],["Remaining","remainingMinor"],["Installments","installmentsLeft"],["Next due","nextDueAt"],["Status","status"]]},
+              auctions:{path:"/api/auctions",columns:[["ID","id"],["Seller","sellerName"],["Quantity","quantity"],["Price","priceMinor"],["Status","status"],["Expires","expiresAt"]]},
+              orders:{path:"/api/orders",columns:[["ID","id"],["Requester","requester"],["Claimer","claimer"],["Item","itemKey"],["Quantity","quantity"],["Reward","rewardMinor"],["Status","status"],["Expires","expiresAt"]]},
+              moderation:{path:"/api/moderation",columns:[["Player UUID","player"],["Action","action"],["Reason","reason"],["Expires","expiresAt"],["Created","createdAt"]]},
+              logs:{path:"/api/logs",columns:[["Type","type"],["Detail","detail"],["Time","createdAt"]]},
+              backups:{path:"/api/backups",columns:[["Backup file","name"],["Size","sizeBytes"],["Modified","modifiedAt"]]}
+            };
+            if(currentTab==="config") {
+              const settings=await api("/api/config");
+              root.innerHTML='<table><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>'+Object.entries(settings).map(([key,value])=>'<tr><td>'+escapeHtml(key)+'</td><td>'+escapeHtml(value)+'</td></tr>').join("")+'</tbody></table>';
+            } else {
+              const definition=tables[currentTab];
+              const rows=await api(definition.path);
+              root.innerHTML=rows.length?'<table><thead><tr>'+definition.columns.map(column=>'<th>'+escapeHtml(column[0])+'</th>').join("")+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+definition.columns.map(column=>'<td>'+renderValue(column[1],row[column[1]])+'</td>').join("")+'</tr>').join("")+'</tbody></table>':'<div class="empty">No records found.</div>';
+            }
           }
         } catch(error) { root.innerHTML='<div class="empty">'+escapeHtml(error.message)+'</div>'; }
+      }
+      function renderValue(key,value) {
+        if(value===null||value===undefined||value==="") return '<span class="muted">—</span>';
+        if(key==="amountMinor"||key==="remainingMinor"||key==="priceMinor"||key==="rewardMinor") return '<span class="positive">₣฿'+(Number(value)/100).toFixed(2)+'</span>';
+        if(key==="sizeBytes") return escapeHtml((Number(value)/1048576).toFixed(2)+" MB");
+        if(key==="createdAt"||key==="expiresAt"||key==="dueAt"||key==="nextDueAt"||key==="modifiedAt") return escapeHtml(Number(value)>0?new Date(Number(value)).toLocaleString():"Permanent");
+        return escapeHtml(value);
       }
       function escapeHtml(value) { return String(value).replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character])); }
       restoreSession();

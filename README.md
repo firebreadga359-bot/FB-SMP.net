@@ -18,7 +18,9 @@ The build uses Gradle's Foojay toolchain resolver to provision Java 25 if it is 
 ./gradlew clean assembleServer
 ```
 
-The deployable Paper plugin is `fbsmp-paper/build/libs/fbsmp-paper-1.0.0.jar`. The Velocity companion is in `fbsmp-velocity/build/libs/`. The project is split into `fbsmp-common`, `fbsmp-paper`, and `fbsmp-velocity`.
+The deployable Paper plugin is `fbsmp-paper/build/libs/fbsmp-paper-1.0.0.jar`. The Velocity companion is in `fbsmp-velocity/build/libs/`. The project is split into `fbsmp-common`, `fbsmp-paper`, and `fbsmp-velocity`. Run `./gradlew test build` before packaging a release.
+
+Run `./package.sh` to run the tests, build both server plugins, and create a source-and-binaries ZIP under `dist/`. The archive contains only the example server configs; do not place secrets in those files.
 
 ## Install
 
@@ -43,21 +45,25 @@ Implemented player commands:
 - `/sethome`, `/home`, `/homes`, `/delhome`
 - `/warp`, `/rtpq`, `/tpa`, `/tpahere`, `/tpaccept`, `/tpdeny`
 - `/msg`, `/tell`, `/w`, `/reply`, `/r`, `/ignore`
-- `/stats`, `/settings`, `/afk`, `/shop`
-- `/fbsmp version`, `/fbsmp calendar`, `/fbsmp backup`, `/fbsmp reload`, `/fbsmp debug`, `/fbsmp warp`
+- `/stats`, `/settings`, `/afk`, `/sell`, `/shop`
+- `/ah`, `/aushop`, `/ausell`, `/loan`, `/mort`, `/mortvu`, `/gift`, `/orders`
+- `/ban`, `/kick`, `/timeout`
+- `/fbsmp version`, `/fbsmp calendar`, `/fbsmp backup`, `/fbsmp reload`, `/fbsmp debug`, `/fbsmp database`, `/fbsmp player`, `/fbsmp economy`, `/fbsmp warp`
 
-The SQLite schema also defines persistent auction, loan, mortgage, order, moderation, and calendar records. Their full command workflows and inventory GUIs are still under development; do not treat those modules as production-ready yet.
+The implementation includes server-validated shop and auction purchases, safe mailbox delivery, loan and mortgage ledgers, community orders, persisted moderation, player settings, and server-side GUI controls. The starter kit is one-time, queued through player mail, and contains no weapons.
+
+**Incomplete / not production-ready:** `/gift` currently supports confirmed currency gifts only; item gifts are not implemented. Mortgage offers are disabled until `available-properties` is configured, and mortgage records are financial contracts only: they do not claim land or grant in-world ownership. Auction item recovery across a crash between inventory removal and listing persistence has not been proven safe. Review those paths and test on a staging server before enabling an economy with valuable items or property. The project does not include a land-claiming system.
 
 ## Configuration
 
 Defaults and examples are under `fbsmp-paper/src/main/resources/`. The plugin copies them into its data folder on first startup. Change gameplay settings there after the first run; use `/fbsmp reload` for the main config.
 
-Database writes use prepared statements and SQLite transactions. The economy is stored as integer minor units (one hundredth of a ₣฿). Player transfers are atomic and create transaction IDs. The custom calendar stores its start time in SQLite, uses 30-day months, and supports the configured 29-day special month.
+Database writes use prepared statements and SQLite transactions. The economy is stored as integer minor units (one hundredth of a ₣฿). Player transfers are atomic and create transaction IDs. The custom calendar stores its start time in SQLite, uses 30-day months, and supports the configured 29-day special month. `mortgages.yml` starts with an empty asset list; configure only offers that are valid for your server.
 
 ## Backups and recovery
 
 - In-game: `/fbsmp backup` runs a consistent SQLite `VACUUM INTO` snapshot, then applies the configured retention count.
-- Offline CLI: `./backup.sh` uses `sqlite3 .backup` and requires the sqlite3 command to be installed.
+- Offline CLI: `./backup.sh` uses `sqlite3 .backup`, archives server/plugin YAML configuration without admin tokens or forwarding keys, and requires the sqlite3 command to be installed.
 - Restore only while both Paper and Velocity are stopped. Preserve a copy of the current database and plugin configs before replacing them.
 - Use `./stop.sh` for orderly shutdown. It sends TERM and will not force-kill a process that does not stop in 30 seconds.
 

@@ -1,11 +1,15 @@
 package net.firebreadmc.fbsmp.paper.listeners;
 
+import net.firebreadmc.fbsmp.common.FbCalendar;
+import net.firebreadmc.fbsmp.common.Money;
 import net.firebreadmc.fbsmp.paper.FbsmpPlugin;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -20,13 +24,21 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.ScoreboardManager;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
 
 public final class PlayerListener implements Listener {
     private static final Set<Material> UNSAFE_GROUND = Set.of(
@@ -41,6 +53,8 @@ public final class PlayerListener implements Listener {
     private final Map<UUID, Long> sessionStarted = new ConcurrentHashMap<>();
     private final Map<UUID, Activity> pendingActivity = new ConcurrentHashMap<>();
     private final Set<UUID> afk = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, Map<String, Boolean>> preferences = new ConcurrentHashMap<>();
+    private final Map<UUID, Scoreboard> originalScoreboards = new ConcurrentHashMap<>();
 
     public PlayerListener(FbsmpPlugin plugin, FbsmpDatabase database) {
         this.plugin = plugin;
@@ -49,6 +63,7 @@ public final class PlayerListener implements Listener {
         this.sellItemKey = new NamespacedKey(plugin, "sell_line_id");
         Bukkit.getScheduler().runTaskTimer(plugin, this::checkAfk, 20L * 20, 20L * 20);
         Bukkit.getScheduler().runTaskTimer(plugin, this::flushActivity, 20L * 60, 20L * 60);
+        Bukkit.getScheduler().runTaskTimer(plugin, this::refreshScoreboards, 20L * 10, 20L * 60);
     }
 
     @EventHandler
@@ -66,10 +81,22 @@ public final class PlayerListener implements Listener {
                 if (firstJoin && plugin.getConfig().getBoolean("starter-kit.enabled", true)) {
                     database.claimStarterKit(player.getUniqueId());
                 }
+                Map<String, Boolean> loadedPreferences = Map.of(
+                        "scoreboard", Boolean.parseBoolean(database.setting(player.getUniqueId(), "scoreboard", "true")),
+                        "notifications", Boolean.parseBoolean(database.setting(player.getUniqueId(), "notifications", "true")),
+                        "sounds", Boolean.parseBoolean(database.setting(player.getUniqueId(), "sounds", "true"))
+                );
+                long balance = database.balance(player.getUniqueId());
+                long calendarStart = Long.parseLong(database.calendarStart());
+                String calendarDate = FbCalendar.date(calendarStart,
+                        plugin.getConfig().getInt("calendar.day-length-minutes", 30),
+                        plugin.getConfig().getInt("calendar.special-month-days", 29));
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (!player.isOnline()) {
                         return;
                     }
+                    preferences.put(player.getUniqueId(), new ConcurrentHashMap<>(loadedPreferences));
+                    refreshScoreboard(player, balance, calendarDate);
                     Set<String> taggedLines = getTaggedSellLines(player);
                     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                         try {
@@ -101,6 +128,8 @@ public final class PlayerListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
         afk.remove(playerId);
+        restoreScoreboard(event.getPlayer());
+        preferences.remove(playerId);
         flushPlayer(playerId);
         lastActivity.remove(playerId);
         sessionStarted.remove(playerId);
@@ -142,6 +171,129 @@ public final class PlayerListener implements Listener {
 
     public boolean isAfk(UUID playerId) {
         return afk.contains(playerId);
+    }
+
+    public boolean preference(UUID playerId, String key) {
+        return preferences.getOrDefault(playerId, Map.of()).getOrDefault(key, true);
+    }
+
+    public void setPreference(Player player, String key, boolean value, Consumer<Boolean> completed) {
+        UUID playerId = player.getUniqueId();
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            boolean saved = false;
+            long balance = 0L;
+            boolean balanceLoaded = false;
+            try {
+                database.setSetting(playerId, key, Boolean.toString(value), System.currentTimeMillis());
+                saved = true;
+                if (key.equals("scoreboard") && value) {
+                    balance = database.balance(playerId);
+                    balanceLoaded = true;
+                }
+            } catch (SQLException exception) {
+                plugin.getLogger().warning("Could not save setting " + key + " for " + playerId + ": "
+                        + exception.getMessage());
+            }
+            boolean success = saved;
+            long currentBalance = balance;
+            boolean hasBalance = balanceLoaded;
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player online = Bukkit.getPlayer(playerId);
+                if (success) {
+                    preferences.computeIfAbsent(playerId, ignored -> new ConcurrentHashMap<>()).put(key, value);
+                    if (key.equals("scoreboard") && online != null) {
+                        if (value && hasBalance) {
+                            refreshScoreboard(online, currentBalance);
+                        } else {
+                            restoreScoreboard(online);
+                        }
+                    }
+                }
+                if (online != null) {
+                    completed.accept(success);
+                }
+            });
+        });
+    }
+
+    public void notifySystem(Player player, String message, Sound sound) {
+        if (!preference(player.getUniqueId(), "notifications")) {
+            return;
+        }
+        player.sendMessage(message);
+        if (sound != null && preference(player.getUniqueId(), "sounds")) {
+            player.playSound(player.getLocation(), sound, 0.7f, 1.0f);
+        }
+    }
+
+    private void refreshScoreboards() {
+        Map<UUID, Player> online = new HashMap<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            online.put(player.getUniqueId(), player);
+        }
+        if (online.isEmpty()) {
+            return;
+        }
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            Map<UUID, Long> balances = new HashMap<>();
+            String calendarDate = "";
+            try {
+                for (UUID playerId : online.keySet()) {
+                    balances.put(playerId, database.balance(playerId));
+                }
+                long start = Long.parseLong(database.calendarStart());
+                calendarDate = FbCalendar.date(start, plugin.getConfig().getInt("calendar.day-length-minutes", 30),
+                        plugin.getConfig().getInt("calendar.special-month-days", 29));
+            } catch (Exception exception) {
+                plugin.getLogger().warning("Could not refresh player scoreboard data: " + exception.getMessage());
+            }
+            String date = calendarDate;
+            Bukkit.getScheduler().runTask(plugin, () -> online.keySet().forEach(playerId -> {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null && preference(playerId, "scoreboard")) {
+                    refreshScoreboard(player, balances.getOrDefault(playerId, 0L), date);
+                }
+            }));
+        });
+    }
+
+    private void refreshScoreboard(Player player, long balance) {
+        refreshScoreboard(player, balance, "");
+    }
+
+    private void refreshScoreboard(Player player, long balance, String calendarDate) {
+        if (!preference(player.getUniqueId(), "scoreboard")) {
+            restoreScoreboard(player);
+            return;
+        }
+        ScoreboardManager manager = Bukkit.getScoreboardManager();
+        if (manager == null) {
+            return;
+        }
+        Scoreboard scoreboard = player.getScoreboard();
+        Objective objective = scoreboard.getObjective("fbsmp");
+        if (objective == null) {
+            originalScoreboards.putIfAbsent(player.getUniqueId(), scoreboard);
+            scoreboard = manager.getNewScoreboard();
+            objective = scoreboard.registerNewObjective("fbsmp", "dummy", ChatColor.GOLD + "FB-SMP");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            player.setScoreboard(scoreboard);
+        }
+        for (String entry : scoreboard.getEntries()) {
+            scoreboard.resetScores(entry);
+        }
+        objective.getScore(ChatColor.YELLOW + "Balance " + ChatColor.WHITE + Money.format(balance)).setScore(3);
+        objective.getScore(ChatColor.GREEN + "Online " + ChatColor.WHITE + Bukkit.getOnlinePlayers().size()).setScore(2);
+        if (!calendarDate.isBlank()) {
+            objective.getScore(ChatColor.GRAY + calendarDate).setScore(1);
+        }
+    }
+
+    private void restoreScoreboard(Player player) {
+        Scoreboard previous = originalScoreboards.remove(player.getUniqueId());
+        if (previous != null && Bukkit.getScoreboardManager() != null) {
+            player.setScoreboard(previous);
+        }
     }
 
     public void toggleAfk(Player player) {

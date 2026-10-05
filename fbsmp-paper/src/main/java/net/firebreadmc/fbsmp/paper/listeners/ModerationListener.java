@@ -8,6 +8,7 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.UUID;
 
 public final class ModerationListener implements Listener {
@@ -26,7 +27,8 @@ public final class ModerationListener implements Listener {
             var ban = database.activeModeration(event.getUniqueId(), "BAN", System.currentTimeMillis());
             if (ban.isPresent()) {
                 FbsmpDatabase.ModerationEntry record = ban.get();
-                String expiry = record.expiresAt() == null ? "Permanent" : "Until " + record.expiresAt();
+                String expiry = record.expiresAt() == null ? "Permanent" : "Until "
+                        + Instant.ofEpochMilli(record.expiresAt());
                 event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED,
                         "You are banned from FB-SMP.\nReason: " + record.reason() + "\n" + expiry);
             }

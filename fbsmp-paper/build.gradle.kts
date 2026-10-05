@@ -30,6 +30,7 @@ tasks.jar {
 }
 
 tasks.register<Jar>("shadowJar") {
+    dependsOn(":fbsmp-common:jar")
     archiveClassifier.set("")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(sourceSets.main.get().output)

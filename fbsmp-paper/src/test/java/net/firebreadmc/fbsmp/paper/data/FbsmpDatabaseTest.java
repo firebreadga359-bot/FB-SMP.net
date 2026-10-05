@@ -77,6 +77,8 @@ class FbsmpDatabaseTest {
         assertEquals(95_000, database.balance(bob));
         assertEquals(83_500, database.balance(alice));
         assertEquals(itemData, database.pendingMail(bob).get(0).itemData());
+        assertEquals(1, database.stats(bob).auctionTrades());
+        assertTrue(database.stats(bob).transactions() > 0);
     }
 
     @Test

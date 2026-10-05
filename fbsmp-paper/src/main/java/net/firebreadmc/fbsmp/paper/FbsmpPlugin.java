@@ -4,8 +4,13 @@ import net.firebreadmc.fbsmp.paper.admin.PrivateAdminPanel;
 import net.firebreadmc.fbsmp.paper.commands.CommandRouter;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
+import net.firebreadmc.fbsmp.paper.listeners.ModerationListener;
 import net.firebreadmc.fbsmp.paper.menus.ShopMenu;
 import net.firebreadmc.fbsmp.paper.menus.SellMenu;
+import net.firebreadmc.fbsmp.paper.menus.MortgageMenu;
+import net.firebreadmc.fbsmp.paper.menus.WarpMenu;
+import net.firebreadmc.fbsmp.paper.menus.SettingsMenu;
+import net.firebreadmc.fbsmp.paper.menus.AuctionMenu;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -49,13 +54,20 @@ public final class FbsmpPlugin extends JavaPlugin {
         }
 
         PlayerListener playerListener = new PlayerListener(this, database);
+        new ModerationListener(this, database);
         SellMenu sellMenu = new SellMenu(this, database, playerListener);
         ShopMenu shopMenu = new ShopMenu(this, database, playerListener);
-        CommandRouter router = new CommandRouter(this, database, playerListener, sellMenu, shopMenu);
+        MortgageMenu mortgageMenu = new MortgageMenu(this, database);
+        WarpMenu warpMenu = new WarpMenu(this, database);
+        SettingsMenu settingsMenu = new SettingsMenu(this, database, playerListener);
+        AuctionMenu auctionMenu = new AuctionMenu(this, database, playerListener);
+        CommandRouter router = new CommandRouter(this, database, playerListener, sellMenu, shopMenu,
+                mortgageMenu, warpMenu, settingsMenu, auctionMenu);
         for (String commandName : new String[]{
                 "bal", "baltop", "pay", "sethome", "home", "homes", "delhome", "warp", "rtpq",
                 "tpa", "tpahere", "tpaccept", "tpdeny", "msg", "reply", "ignore", "stats", "settings",
-                "afk", "sell", "shop", "ah", "ausell", "loan", "mort", "mortvu", "gift", "orders", "fbsmp"
+                "afk", "sell", "shop", "ah", "ausell", "loan", "mort", "mortvu", "gift", "orders",
+                "ban", "kick", "timeout", "fbsmp"
         }) {
             Objects.requireNonNull(getCommand(commandName), "Missing command declaration: " + commandName)
                     .setExecutor(router);

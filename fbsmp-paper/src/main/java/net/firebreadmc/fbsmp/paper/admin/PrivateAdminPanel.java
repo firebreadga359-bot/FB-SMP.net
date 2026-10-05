@@ -15,6 +15,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -23,6 +24,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.EnumSet;
 import java.util.Map;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -106,6 +108,38 @@ public final class PrivateAdminPanel implements AutoCloseable {
                 transactions(exchange);
                 return;
             }
+            if (path.equals("/api/loans") && method.equals("GET")) {
+                respondDatabase(exchange, database::adminLoans);
+                return;
+            }
+            if (path.equals("/api/mortgages") && method.equals("GET")) {
+                respondDatabase(exchange, database::adminMortgages);
+                return;
+            }
+            if (path.equals("/api/auctions") && method.equals("GET")) {
+                respondDatabase(exchange, database::adminAuctions);
+                return;
+            }
+            if (path.equals("/api/orders") && method.equals("GET")) {
+                respondDatabase(exchange, database::adminOrders);
+                return;
+            }
+            if (path.equals("/api/moderation") && method.equals("GET")) {
+                respondDatabase(exchange, database::recentModeration);
+                return;
+            }
+            if (path.equals("/api/logs") && method.equals("GET")) {
+                respondDatabase(exchange, database::recentAuditEvents);
+                return;
+            }
+            if (path.equals("/api/backups") && method.equals("GET")) {
+                backups(exchange);
+                return;
+            }
+            if (path.equals("/api/config") && method.equals("GET")) {
+                configuration(exchange);
+                return;
+            }
             if (path.equals("/api/backup") && method.equals("POST")) {
                 if (!validCsrf(exchange, session)) {
                     respond(exchange, 403, Map.of("error", "CSRF validation failed."));
@@ -172,15 +206,20 @@ public final class PrivateAdminPanel implements AutoCloseable {
     private void status(HttpExchange exchange) throws IOException {
         try {
             FbsmpDatabase.AdminSnapshot snapshot = database.adminSnapshot();
-            respond(exchange, 200, Map.of(
-                    "server", "FB-SMP",
-                    "version", plugin.getDescription().getVersion(),
-                    "status", "online",
-                    "uptimeSeconds", plugin.uptimeSeconds(),
-                    "playerRecords", snapshot.playerCount(),
-                    "totalBalance", Money.format(snapshot.totalBalanceMinor()),
-                    "transactionCount", snapshot.transactionCount(),
-                    "serverTime", Instant.now().toString()
+            respond(exchange, 200, Map.ofEntries(
+                    Map.entry("server", "FB-SMP"),
+                    Map.entry("version", plugin.getDescription().getVersion()),
+                    Map.entry("status", "online"),
+                    Map.entry("uptimeSeconds", plugin.uptimeSeconds()),
+                    Map.entry("playerRecords", snapshot.playerCount()),
+                    Map.entry("totalBalance", Money.format(snapshot.totalBalanceMinor())),
+                    Map.entry("transactionCount", snapshot.transactionCount()),
+                    Map.entry("onlinePlayers", plugin.getServer().getOnlinePlayers().size()),
+                    Map.entry("maximumPlayers", plugin.getServer().getMaxPlayers()),
+                    Map.entry("heapUsedBytes", Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()),
+                    Map.entry("heapMaxBytes", Runtime.getRuntime().maxMemory()),
+                    Map.entry("processors", Runtime.getRuntime().availableProcessors()),
+                    Map.entry("serverTime", Instant.now().toString())
             ));
         } catch (SQLException exception) {
             respond(exchange, 503, Map.of("error", "Database unavailable."));
@@ -201,6 +240,63 @@ public final class PrivateAdminPanel implements AutoCloseable {
         } catch (SQLException exception) {
             respond(exchange, 503, Map.of("error", "Database unavailable."));
         }
+    }
+
+    private void respondDatabase(HttpExchange exchange, DatabaseList query) throws IOException {
+        try {
+            respond(exchange, 200, query.fetch(100));
+        } catch (SQLException exception) {
+            respond(exchange, 503, Map.of("error", "Database unavailable."));
+        }
+    }
+
+    private void backups(HttpExchange exchange) throws IOException {
+        Path directory = plugin.getDataFolder().toPath().resolve("backups");
+        if (!Files.isDirectory(directory)) {
+            respond(exchange, 200, List.of());
+            return;
+        }
+        try (var files = Files.list(directory)) {
+            List<Map<String, Object>> rows = files
+                    .filter(path -> path.getFileName().toString().matches("fbsmp-[0-9]{8}-[0-9]{6}\\.sqlite"))
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .limit(50)
+                    .map(path -> {
+                        try {
+                            return Map.<String, Object>of("name", path.getFileName().toString(),
+                                    "sizeBytes", Files.size(path),
+                                    "modifiedAt", Files.getLastModifiedTime(path).toMillis());
+                        } catch (IOException exception) {
+                            return Map.<String, Object>of("name", path.getFileName().toString(),
+                                    "sizeBytes", 0L, "modifiedAt", 0L);
+                        }
+                    }).toList();
+            respond(exchange, 200, rows);
+        }
+    }
+
+    private void configuration(HttpExchange exchange) throws IOException {
+        respond(exchange, 200, Map.ofEntries(
+                Map.entry("database", "SQLite"),
+                Map.entry("economyStartingBalance", Money.format(plugin.getConfig().getLong("economy.starting-balance", 0))),
+                Map.entry("calendarDayLengthMinutes", plugin.getConfig().getInt("calendar.day-length-minutes", 30)),
+                Map.entry("specialMonthDays", plugin.getConfig().getInt("calendar.special-month-days", 29)),
+                Map.entry("defaultHomeLimit", plugin.getConfig().getInt("homes.default-limit", 3)),
+                Map.entry("teleportRequestExpirySeconds", plugin.getConfig().getInt("teleport.request-expiry-seconds", 60)),
+                Map.entry("teleportCooldownSeconds", plugin.getConfig().getInt("teleport.cooldown-seconds", 30)),
+                Map.entry("randomTeleportMinRadius", plugin.getConfig().getInt("teleport.random.min-radius", 500)),
+                Map.entry("randomTeleportMaxRadius", plugin.getConfig().getInt("teleport.random.max-radius", 5000)),
+                Map.entry("starterKitEnabled", plugin.getConfig().getBoolean("starter-kit.enabled", true)),
+                Map.entry("adminPanelBindAddress", plugin.getConfig().getString("admin-panel.bind-address", "127.0.0.1")),
+                Map.entry("adminPanelPort", plugin.getConfig().getInt("admin-panel.port", 8765)),
+                Map.entry("backupRetentionCount", plugin.getConfig().getInt("backups.retention-count", 20)),
+                Map.entry("publicConfigurationOnly", true)
+        ));
+    }
+
+    @FunctionalInterface
+    private interface DatabaseList {
+        Object fetch(int limit) throws SQLException;
     }
 
     private Session authenticatedSession(HttpExchange exchange) {
