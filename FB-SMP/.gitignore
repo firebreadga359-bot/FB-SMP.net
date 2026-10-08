@@ -1,0 +1,29 @@
+# Minecraft generated data
+world/
+world_nether/
+world_the_end/
+logs/
+crash-reports/
+cache/
+
+# Server runtime files
+*.log
+*.lck
+usercache.json
+banned-players.json
+banned-ips.json
+whitelist.json
+ops.json
+
+# Java/runtime
+java25/
+jdk-*/
+*.pid
+
+# Playit
+playit
+
+# Temporary files
+*.tmp
+*.bak
+.DS_Store
