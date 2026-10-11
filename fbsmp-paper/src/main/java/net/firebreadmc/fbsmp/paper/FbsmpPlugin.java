@@ -79,7 +79,7 @@ public final class FbsmpPlugin extends JavaPlugin {
                 "bal", "baltop", "pay", "sethome", "home", "homes", "delhome", "warp", "rtpq",
                 "tpa", "tpahere", "tpaccept", "tpdeny", "msg", "reply", "ignore", "stats", "settings",
                 "afk", "sell", "shop", "ah", "ausell", "loan", "mort", "mortvu", "gift", "orders",
-                "ban", "kick", "timeout", "fbsmp"
+                "ban", "kick", "timeout", "fbsmp", "shopadmin", "loanadmin"
         }) {
             Objects.requireNonNull(getCommand(commandName), "Missing command declaration: " + commandName)
                     .setExecutor(router);

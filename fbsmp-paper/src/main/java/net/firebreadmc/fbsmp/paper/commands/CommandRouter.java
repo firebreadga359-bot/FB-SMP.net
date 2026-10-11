@@ -2,6 +2,10 @@ package net.firebreadmc.fbsmp.paper.commands;
 
 import net.firebreadmc.fbsmp.common.FbCalendar;
 import net.firebreadmc.fbsmp.common.Money;
+import net.firebreadmc.fbsmp.common.shop.PriceRegistry;
+import net.firebreadmc.fbsmp.common.shop.PriceTier;
+import net.firebreadmc.fbsmp.common.shop.PriceValidator;
+import net.firebreadmc.fbsmp.common.shop.ShopCatalog;
 import net.firebreadmc.fbsmp.paper.FbsmpPlugin;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
@@ -108,6 +112,8 @@ public final class CommandRouter implements CommandExecutor {
             case "kick" -> moderate(sender, args, "KICK");
             case "timeout" -> moderate(sender, args, "TIMEOUT");
             case "fbsmp" -> admin(sender, args);
+            case "shopadmin" -> shopAdmin(sender, args);
+            case "loanadmin" -> loanAdmin(sender, args);
             default -> sender.sendMessage(color("&cUnknown FB-SMP command."));
         }
         return true;
@@ -1356,6 +1362,88 @@ public final class CommandRouter implements CommandExecutor {
             }
             default -> sender.sendMessage(color("&7Usage: /fbsmp loan <list|info|forgive|settle|adjust|releasetimeouts> [args]"));
         }
+    }
+
+    /** Direct entry point for the loan administration surface; mirrors {@code /fbsmp loan}. */
+    private void loanAdmin(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("fbsmp.admin")) {
+            sender.sendMessage(color("&cYou do not have permission to use that command."));
+            return;
+        }
+        adminLoan(sender, args);
+    }
+
+    private void shopAdmin(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("fbsmp.admin")) {
+            sender.sendMessage(color("&cYou do not have permission to use that command."));
+            return;
+        }
+        if (args.length == 0 || args[0].equalsIgnoreCase("info")) {
+            showShopInfo(sender);
+            return;
+        }
+        switch (args[0].toLowerCase(Locale.ROOT)) {
+            case "reload" -> {
+                shopMenu.reload();
+                sender.sendMessage(color("&aShop catalog reloaded from &fshop.yml&a, &fsell_prices.yml&a and settings."));
+                showShopInfo(sender);
+            }
+            case "validate", "check" -> showShopValidation(sender);
+            case "price" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(color("&7Usage: /shopadmin price <itemId>"));
+                    return;
+                }
+                showShopPrice(sender, args[1]);
+            }
+            default -> sender.sendMessage(color(
+                    "&7Usage: /shopadmin <info|reload|validate|price <item>>"));
+        }
+    }
+
+    private void showShopInfo(CommandSender sender) {
+        PriceRegistry registry = shopMenu.registry();
+        ShopCatalog catalog = shopMenu.catalog();
+        PriceValidator.Report report = PriceValidator.validate(registry);
+        sender.sendMessage(color("&6FB-SMP shop &7| &f" + catalog.all().size()
+                + " catalog entries &8| &f" + catalog.allCategories().size() + " categories"));
+        sender.sendMessage(color("&7Catalog page size &f" + ShopCatalog.PAGE_SIZE
+                + " &8| &7validation &f" + (report.clean() ? "clean" : report.violations().size() + " violation(s)")
+                + " &8| &7review items &f" + report.reviewItems().size()
+                + " &8| &7disabled &f" + registry.disabledItems().size()));
+        StringBuilder medians = new StringBuilder("&7Tier buy medians: ");
+        for (Map.Entry<PriceTier, Long> entry : report.tierMedianBuy().entrySet()) {
+            medians.append("&f").append(entry.getKey()).append("&7=")
+                    .append(Money.format(entry.getValue())).append("  ");
+        }
+        sender.sendMessage(color(medians.toString().trim()));
+    }
+
+    private void showShopValidation(CommandSender sender) {
+        PriceValidator.Report report = PriceValidator.validate(shopMenu.registry());
+        sender.sendMessage(color("&6Price validation: &f" + report.checked() + " rules checked"
+                + (report.clean() ? " &a— clean" : " &c— " + report.violations().size() + " violation(s)")));
+        report.violations().stream().limit(20).forEach(violation ->
+                sender.sendMessage(color("&c" + violation.itemId() + " &7" + violation.message())));
+        if (report.violations().size() > 20) {
+            sender.sendMessage(color("&7...and " + (report.violations().size() - 20) + " more."));
+        }
+        if (!report.reviewItems().isEmpty()) {
+            sender.sendMessage(color("&6Needs review: &f" + String.join(", ", report.reviewItems())));
+        }
+    }
+
+    private void showShopPrice(CommandSender sender, String rawId) {
+        PriceRegistry registry = shopMenu.registry();
+        String id = net.firebreadmc.fbsmp.paper.shop.ShopPricing.normalizeKey(rawId);
+        PriceRegistry.Rule rule = registry.rule(id);
+        Long buy = registry.buyPrice(id);
+        Long sell = registry.sellPrice(id);
+        sender.sendMessage(color("&6" + id + " &8| &7category &f" + rule.category()
+                + " &7tier &f" + rule.tier() + " &7source &f" + rule.source()));
+        sender.sendMessage(color("&7Buy &f" + (buy == null ? "unavailable" : Money.format(buy))
+                + " &7Sell &f" + (sell == null ? "unavailable" : Money.format(sell))
+                + " &8| &7buyable &f" + rule.buyable() + " &7sellable &f" + rule.sellable()));
     }
 
     private long parseLong(CommandSender sender, String[] args, int index) {

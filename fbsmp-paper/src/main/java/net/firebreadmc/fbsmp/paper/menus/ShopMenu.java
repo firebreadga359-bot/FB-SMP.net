@@ -81,6 +81,10 @@ public final class ShopMenu implements Listener {
         return loaded.registry().sellPrice(itemId);
     }
 
+    public net.firebreadmc.fbsmp.common.shop.PriceRegistry registry() {
+        return loaded.registry();
+    }
+
     public boolean isGuiMarker(ItemStack item) {
         return item != null && item.hasItemMeta()
                 && item.getItemMeta().getPersistentDataContainer().has(guiMarkerKey, PersistentDataType.BYTE);

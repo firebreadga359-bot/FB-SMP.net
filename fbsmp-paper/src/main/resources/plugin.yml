@@ -93,6 +93,14 @@ commands:
   fbsmp:
     description: FB-SMP administration and utilities.
     usage: /fbsmp <version|backup|reload|warp|calendar>
+  shopadmin:
+    description: Inspect and reload the shop catalog and prices.
+    usage: /shopadmin <info|reload|validate|price <item>>
+    permission: fbsmp.admin
+  loanadmin:
+    description: Manage the loan system.
+    usage: /loanadmin <list|info|forgive|settle|adjust|releasetimeouts> [args]
+    permission: fbsmp.admin
 permissions:
   fbsmp.admin:
     description: Use FB-SMP administration commands.
