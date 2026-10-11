@@ -88,6 +88,7 @@ public final class PlayerListener implements Listener {
                 );
                 long balance = database.balance(player.getUniqueId());
                 long calendarStart = Long.parseLong(database.calendarStart());
+                List<FbsmpDatabase.Notice> notices = database.undeliveredNotices(player.getUniqueId());
                 String calendarDate = FbCalendar.date(calendarStart,
                         plugin.getConfig().getInt("calendar.day-length-minutes", 30),
                         plugin.getConfig().getInt("calendar.special-month-days", 29));
@@ -97,6 +98,22 @@ public final class PlayerListener implements Listener {
                     }
                     preferences.put(player.getUniqueId(), new ConcurrentHashMap<>(loadedPreferences));
                     refreshScoreboard(player, balance, calendarDate);
+                    for (FbsmpDatabase.Notice notice : notices) {
+                        player.sendMessage(org.bukkit.ChatColor.GOLD + "[Loan] "
+                                + org.bukkit.ChatColor.YELLOW + notice.message());
+                    }
+                    if (!notices.isEmpty()) {
+                        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                            try {
+                                database.markNoticesDelivered(
+                                        notices.stream().map(FbsmpDatabase.Notice::id).toList(),
+                                        System.currentTimeMillis());
+                            } catch (SQLException exception) {
+                                plugin.getLogger().warning("Could not mark loan notices delivered: "
+                                        + exception.getMessage());
+                            }
+                        });
+                    }
                     Set<String> taggedLines = getTaggedSellLines(player);
                     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                         try {

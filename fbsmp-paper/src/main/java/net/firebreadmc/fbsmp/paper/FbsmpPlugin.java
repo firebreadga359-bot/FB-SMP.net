@@ -1,9 +1,12 @@
 package net.firebreadmc.fbsmp.paper;
 
+import net.firebreadmc.fbsmp.common.sell.SellEligibilityPolicy;
 import net.firebreadmc.fbsmp.paper.admin.PrivateAdminPanel;
 import net.firebreadmc.fbsmp.paper.commands.CommandRouter;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
+import net.firebreadmc.fbsmp.paper.loan.LoanService;
+import net.firebreadmc.fbsmp.paper.sell.SellService;
 import net.firebreadmc.fbsmp.paper.listeners.ModerationListener;
 import net.firebreadmc.fbsmp.paper.menus.ShopMenu;
 import net.firebreadmc.fbsmp.paper.menus.SellMenu;
@@ -55,14 +58,23 @@ public final class FbsmpPlugin extends JavaPlugin {
 
         PlayerListener playerListener = new PlayerListener(this, database);
         new ModerationListener(this, database);
-        SellMenu sellMenu = new SellMenu(this, database, playerListener);
         ShopMenu shopMenu = new ShopMenu(this, database, playerListener);
+        SellService sellService = new SellService(shopMenu, new SellEligibilityPolicy(
+                SellEligibilityPolicy.Config.defaults()));
+        SellMenu sellMenu = new SellMenu(this, database, playerListener, sellService);
         MortgageMenu mortgageMenu = new MortgageMenu(this, database);
         WarpMenu warpMenu = new WarpMenu(this, database);
         SettingsMenu settingsMenu = new SettingsMenu(this, database, playerListener);
         AuctionMenu auctionMenu = new AuctionMenu(this, database, playerListener);
+        LoanService loanService = null;
+        try {
+            long calendarStart = Long.parseLong(database.calendarStart());
+            loanService = new LoanService(this, database, calendarStart);
+        } catch (SQLException exception) {
+            getLogger().severe("Could not initialise the loan service: " + exception.getMessage());
+        }
         CommandRouter router = new CommandRouter(this, database, playerListener, sellMenu, shopMenu,
-                mortgageMenu, warpMenu, settingsMenu, auctionMenu);
+                mortgageMenu, warpMenu, settingsMenu, auctionMenu, loanService);
         for (String commandName : new String[]{
                 "bal", "baltop", "pay", "sethome", "home", "homes", "delhome", "warp", "rtpq",
                 "tpa", "tpahere", "tpaccept", "tpdeny", "msg", "reply", "ignore", "stats", "settings",
@@ -86,6 +98,16 @@ public final class FbsmpPlugin extends JavaPlugin {
                 getLogger().warning("Could not process expired listings: " + exception.getMessage());
             }
         }, 20L * 60, 20L * 60 * 5);
+        if (loanService != null) {
+            LoanService scheduled = loanService;
+            Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+                try {
+                    scheduled.tick();
+                } catch (SQLException exception) {
+                    getLogger().warning("Loan tick failed: " + exception.getMessage());
+                }
+            }, 20L * 60, 20L * 60);
+        }
         if (getConfig().getBoolean("admin-panel.enabled", true)) {
             try {
                 adminPanel = new PrivateAdminPanel(this, database);

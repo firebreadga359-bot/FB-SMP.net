@@ -51,6 +51,7 @@ public final class FbsmpDatabase implements AutoCloseable {
         applyMigration(resourceLoader, 1, "db/migration/V1__initial.sql");
         applyMigration(resourceLoader, 2, "db/migration/V2__transactions_and_mailbox.sql");
         applyMigration(resourceLoader, 3, "db/migration/V3__sell_escrow.sql");
+        applyMigration(resourceLoader, 4, "db/migration/V4__shop_sell_loan_upgrade.sql");
         synchronized (lock) {
             try (Statement statement = connection.createStatement()) {
                 statement.executeUpdate("""
@@ -2120,6 +2121,546 @@ public final class FbsmpDatabase implements AutoCloseable {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Shop / sell / loan upgrade (V4). Additive; existing methods are unchanged.
+    // ---------------------------------------------------------------------
+
+    public long issueLoanV2(UUID playerId, long principalMinor, long interestMinor,
+                            long issueDayIndex, long dueDayIndex, int termDays,
+                            String createdCalendarDate, long maximumOutstanding,
+                            boolean bypassLimits, long dueAt, long now) throws SQLException {
+        if (principalMinor <= 0 || interestMinor < 0 || dueDayIndex < issueDayIndex) {
+            throw new IllegalArgumentException("Loan values are invalid.");
+        }
+        synchronized (lock) {
+            boolean previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                long outstanding = 0;
+                try (PreparedStatement active = connection.prepareStatement("""
+                        SELECT COALESCE(SUM(remaining_minor), 0) FROM loans
+                        WHERE player_uuid = ? AND status IN ('ACTIVE','OVERDUE')
+                        """)) {
+                    active.setString(1, playerId.toString());
+                    try (ResultSet result = active.executeQuery()) {
+                        outstanding = result.next() ? result.getLong(1) : 0;
+                    }
+                }
+                long total = Math.addExact(principalMinor, interestMinor);
+                if (!bypassLimits && outstanding + total > maximumOutstanding) {
+                    connection.rollback();
+                    return -1;
+                }
+                long loanId;
+                try (PreparedStatement insert = connection.prepareStatement("""
+                        INSERT INTO loans(player_uuid, principal_minor, interest_minor, remaining_minor,
+                        due_at, status, created_at, issue_day_index, due_day_index, term_days,
+                        original_remaining_minor, warning_state, created_calendar_date)
+                        VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, ?, 'NONE', ?)
+                        """, Statement.RETURN_GENERATED_KEYS)) {
+                    insert.setString(1, playerId.toString());
+                    insert.setLong(2, principalMinor);
+                    insert.setLong(3, interestMinor);
+                    insert.setLong(4, total);
+                    insert.setLong(5, dueAt);
+                    insert.setLong(6, now);
+                    insert.setLong(7, issueDayIndex);
+                    insert.setLong(8, dueDayIndex);
+                    insert.setInt(9, termDays);
+                    insert.setLong(10, total);
+                    insert.setString(11, createdCalendarDate);
+                    insert.executeUpdate();
+                    try (ResultSet keys = insert.getGeneratedKeys()) {
+                        loanId = keys.next() ? keys.getLong(1) : -1;
+                    }
+                }
+                try (PreparedStatement credit = connection.prepareStatement(
+                        "UPDATE players SET balance_minor = balance_minor + ? WHERE uuid = ?")) {
+                    credit.setLong(1, principalMinor);
+                    credit.setString(2, playerId.toString());
+                    if (credit.executeUpdate() != 1) {
+                        connection.rollback();
+                        return -1;
+                    }
+                }
+                insertTransaction(null, playerId.toString(), principalMinor, "LOAN_DISBURSEMENT",
+                        "Loan disbursement (loan #" + loanId + ")", now);
+                connection.commit();
+                return loanId;
+            } catch (SQLException | RuntimeException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
+            }
+        }
+    }
+
+    public List<LoanRow> activeLoans() throws SQLException {
+        return queryLoans("WHERE status IN ('ACTIVE','OVERDUE')", null);
+    }
+
+    public List<LoanRow> loansFor(UUID playerId) throws SQLException {
+        return queryLoans("WHERE player_uuid = ?", playerId.toString());
+    }
+
+    public LoanRow loanById(long loanId) throws SQLException {
+        List<LoanRow> rows = queryLoans("WHERE id = ?", Long.toString(loanId));
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public long loanOutstanding(UUID playerId) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COALESCE(SUM(remaining_minor), 0) FROM loans
+                    WHERE player_uuid = ? AND status IN ('ACTIVE','OVERDUE')
+                    """)) {
+                statement.setString(1, playerId.toString());
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? result.getLong(1) : 0;
+                }
+            }
+        }
+    }
+
+    public int activeLoanCount(UUID playerId) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COUNT(*) FROM loans WHERE player_uuid = ? AND status IN ('ACTIVE','OVERDUE')
+                    """)) {
+                statement.setString(1, playerId.toString());
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? result.getInt(1) : 0;
+                }
+            }
+        }
+    }
+
+    public int loansIssuedOnCalendarDate(UUID playerId, String calendarDate) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COUNT(*) FROM loans WHERE player_uuid = ? AND created_calendar_date = ?
+                    """)) {
+                statement.setString(1, playerId.toString());
+                statement.setString(2, calendarDate);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? result.getInt(1) : 0;
+                }
+            }
+        }
+    }
+
+    public long lastRepaymentAt(UUID playerId) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT COALESCE(MAX(created_at), 0) FROM economy_transactions
+                    WHERE receiver_uuid = ? AND transaction_type = 'LOAN_REPAYMENT'
+                    """)) {
+                statement.setString(1, playerId.toString());
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? result.getLong(1) : 0;
+                }
+            }
+        }
+    }
+
+    /** Sets warning state only if the loan has not already warned for this day. */
+    public boolean markWarningSent(long loanId, long dayIndex, long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE loans SET warning_state = 'SENT', warning_sent_for_day = ?
+                    WHERE id = ? AND (warning_state IS NULL OR warning_state != 'SENT')
+                    """)) {
+                statement.setLong(1, dayIndex);
+                statement.setLong(2, loanId);
+                boolean changed = statement.executeUpdate() == 1;
+                if (changed) {
+                    insertLoanEvent(loanId, null, "WARNING", dayIndex, "", now);
+                }
+                return changed;
+            }
+        }
+    }
+
+    public void markOverdue(long loanId, long overdueEventId, long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE loans SET status = 'OVERDUE', overdue_event_id = ?
+                    WHERE id = ? AND status = 'ACTIVE'
+                    """)) {
+                statement.setLong(1, overdueEventId);
+                statement.setLong(2, loanId);
+                statement.executeUpdate();
+            }
+        }
+    }
+
+    public long createLoanEvent(long loanId, String playerUuid, String type,
+                                Long dayIndex, String detail, long now) throws SQLException {
+        synchronized (lock) {
+            return insertLoanEvent(loanId, playerUuid, type, dayIndex, detail, now);
+        }
+    }
+
+    /** Creates a timeout at most once per overdue event (UNIQUE guard). */
+    public boolean createLoanTimeoutOnce(long loanId, UUID playerId, long overdueEventId,
+                                         String reason, long remainingMinor,
+                                         long startedAt, long expiresAt) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT OR IGNORE INTO loan_timeouts
+                    (loan_id, player_uuid, overdue_event_id, reason, remaining_minor,
+                     started_at, expires_at, released)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                    """)) {
+                statement.setLong(1, loanId);
+                statement.setString(2, playerId.toString());
+                statement.setLong(3, overdueEventId);
+                statement.setString(4, reason);
+                statement.setLong(5, remainingMinor);
+                statement.setLong(6, startedAt);
+                statement.setLong(7, expiresAt);
+                return statement.executeUpdate() == 1;
+            }
+        }
+    }
+
+    /** The active timeout that currently blocks a player, if any. */
+    public LoanTimeout activeTimeout(UUID playerId, long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT id, loan_id, reason, remaining_minor, started_at, expires_at
+                    FROM loan_timeouts
+                    WHERE player_uuid = ? AND released = 0 AND expires_at > ?
+                    ORDER BY expires_at DESC LIMIT 1
+                    """)) {
+                statement.setString(1, playerId.toString());
+                statement.setLong(2, now);
+                try (ResultSet result = statement.executeQuery()) {
+                    if (!result.next()) {
+                        return null;
+                    }
+                    return new LoanTimeout(result.getLong(1), result.getLong(2), result.getString(3),
+                            result.getLong(4), result.getLong(5), result.getLong(6));
+                }
+            }
+        }
+    }
+
+    public int releaseExpiredTimeouts(long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE loan_timeouts SET released = 1, released_at = ?
+                    WHERE released = 0 AND expires_at <= ?
+                    """)) {
+                statement.setLong(1, now);
+                statement.setLong(2, now);
+                return statement.executeUpdate();
+            }
+        }
+    }
+
+    public int releaseTimeoutsForLoan(long loanId, long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE loan_timeouts SET released = 1, released_at = ?
+                    WHERE loan_id = ? AND released = 0
+                    """)) {
+                statement.setLong(1, now);
+                statement.setLong(2, loanId);
+                return statement.executeUpdate();
+            }
+        }
+    }
+
+    public int releaseTimeoutsForPaidLoans(UUID playerId, long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE loan_timeouts SET released = 1, released_at = ?
+                    WHERE released = 0 AND loan_id IN (
+                        SELECT id FROM loans WHERE player_uuid = ? AND status = 'PAID')
+                    """)) {
+                statement.setLong(1, now);
+                statement.setString(2, playerId.toString());
+                return statement.executeUpdate();
+            }
+        }
+    }
+
+    public boolean forgiveLoan(long loanId, String reason, long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE loans SET status = 'PAID', forgiven = 1, settled = 1
+                    WHERE id = ? AND status IN ('ACTIVE','OVERDUE')
+                    """)) {
+                statement.setLong(1, loanId);
+                boolean changed = statement.executeUpdate() == 1;
+                if (changed) {
+                    insertLoanEvent(loanId, null, "FORGIVEN", null, reason, now);
+                    releaseTimeoutsForLoanLocked(loanId, now);
+                }
+                return changed;
+            }
+        }
+    }
+
+    public boolean settleLoan(long loanId, String reason, long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE loans SET status = 'PAID', settled = 1
+                    WHERE id = ? AND status IN ('ACTIVE','OVERDUE')
+                    """)) {
+                statement.setLong(1, loanId);
+                boolean changed = statement.executeUpdate() == 1;
+                if (changed) {
+                    insertLoanEvent(loanId, null, "SETTLED", null, reason, now);
+                    releaseTimeoutsForLoanLocked(loanId, now);
+                }
+                return changed;
+            }
+        }
+    }
+
+    public boolean adjustLoanRemaining(long loanId, long newRemaining, String reason, long now)
+            throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    UPDATE loans SET remaining_minor = ?, status = ?
+                    WHERE id = ?
+                    """)) {
+                statement.setLong(1, newRemaining);
+                statement.setString(2, newRemaining == 0 ? "PAID" : "ACTIVE");
+                statement.setLong(3, loanId);
+                boolean changed = statement.executeUpdate() == 1;
+                if (changed) {
+                    insertLoanEvent(loanId, null, "ADJUSTED", null,
+                            reason + " -> " + newRemaining, now);
+                    if (newRemaining == 0) {
+                        releaseTimeoutsForLoanLocked(loanId, now);
+                    }
+                }
+                return changed;
+            }
+        }
+    }
+
+    public boolean addLoanNotice(UUID playerId, Long loanId, String noticeType,
+                                 String message, long now) throws SQLException {
+        synchronized (lock) {
+            if (loanId != null) {
+                try (PreparedStatement check = connection.prepareStatement("""
+                        SELECT 1 FROM loan_notices WHERE loan_id = ? AND notice_type = ?
+                        """)) {
+                    check.setLong(1, loanId);
+                    check.setString(2, noticeType);
+                    try (ResultSet result = check.executeQuery()) {
+                        if (result.next()) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            try (PreparedStatement insert = connection.prepareStatement("""
+                    INSERT INTO loan_notices(player_uuid, loan_id, notice_type, message, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """)) {
+                insert.setString(1, playerId.toString());
+                if (loanId == null) {
+                    insert.setNull(2, java.sql.Types.INTEGER);
+                } else {
+                    insert.setLong(2, loanId);
+                }
+                insert.setString(3, noticeType);
+                insert.setString(4, message);
+                insert.setLong(5, now);
+                insert.executeUpdate();
+                return true;
+            }
+        }
+    }
+
+    public List<Notice> undeliveredNotices(UUID playerId) throws SQLException {
+        synchronized (lock) {
+            List<Notice> notices = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT id, notice_type, message FROM loan_notices
+                    WHERE player_uuid = ? AND delivered_at IS NULL ORDER BY id
+                    """)) {
+                statement.setString(1, playerId.toString());
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        notices.add(new Notice(result.getLong(1), result.getString(2), result.getString(3)));
+                    }
+                }
+            }
+            return notices;
+        }
+    }
+
+    public void markNoticesDelivered(List<Long> noticeIds, long now) throws SQLException {
+        if (noticeIds.isEmpty()) {
+            return;
+        }
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "UPDATE loan_notices SET delivered_at = ? WHERE id = ?")) {
+                for (Long id : noticeIds) {
+                    statement.setLong(1, now);
+                    statement.setLong(2, id);
+                    statement.addBatch();
+                }
+                statement.executeBatch();
+            }
+        }
+    }
+
+    public String meta(String key) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT value FROM loan_meta WHERE key = ?")) {
+                statement.setString(1, key);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? result.getString(1) : null;
+                }
+            }
+        }
+    }
+
+    public void setMeta(String key, String value) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO loan_meta(key, value) VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """)) {
+                statement.setString(1, key);
+                statement.setString(2, value);
+                statement.executeUpdate();
+            }
+        }
+    }
+
+    public void writeAudit(UUID actorUuid, String actorName, String action, String target,
+                           String beforeJson, String afterJson, String reason, long now)
+            throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO fbsmp_audit_log
+                    (actor_uuid, actor_name, action, target, before_json, after_json, reason, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """)) {
+                if (actorUuid == null) {
+                    statement.setNull(1, java.sql.Types.VARCHAR);
+                } else {
+                    statement.setString(1, actorUuid.toString());
+                }
+                statement.setString(2, actorName == null ? "console" : actorName);
+                statement.setString(3, action);
+                statement.setString(4, target == null ? "" : target);
+                statement.setString(5, beforeJson == null ? "" : beforeJson);
+                statement.setString(6, afterJson == null ? "" : afterJson);
+                statement.setString(7, reason == null ? "" : reason);
+                statement.setLong(8, now);
+                statement.executeUpdate();
+            }
+        }
+    }
+
+    public List<AuditRow> recentAuditLog(int limit) throws SQLException {
+        synchronized (lock) {
+            List<AuditRow> rows = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT actor_name, action, target, reason, created_at FROM fbsmp_audit_log
+                    ORDER BY created_at DESC LIMIT ?
+                    """)) {
+                statement.setInt(1, Math.max(1, Math.min(200, limit)));
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        rows.add(new AuditRow(result.getString(1), result.getString(2),
+                                result.getString(3), result.getString(4), result.getLong(5)));
+                    }
+                }
+            }
+            return rows;
+        }
+    }
+
+    private List<LoanRow> queryLoans(String whereClause, String parameter) throws SQLException {
+        synchronized (lock) {
+            List<LoanRow> rows = new ArrayList<>();
+            String sql = """
+                    SELECT id, player_uuid, principal_minor, interest_minor, remaining_minor,
+                    due_at, status, issue_day_index, due_day_index, term_days,
+                    original_remaining_minor, warning_state, warning_sent_for_day, overdue_event_id,
+                    forgiven, settled, created_calendar_date
+                    FROM loans
+                    """ + whereClause;
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                if (parameter != null) {
+                    statement.setString(1, parameter);
+                }
+                try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                        rows.add(new LoanRow(
+                                result.getLong(1),
+                                result.getString(2),
+                                result.getLong(3),
+                                result.getLong(4),
+                                result.getLong(5),
+                                result.getLong(6),
+                                result.getString(7),
+                                result.getLong(8),
+                                result.getLong(9),
+                                result.getInt(10),
+                                result.getLong(11),
+                                result.getString(12),
+                                result.getObject(13) == null ? null : result.getLong(13),
+                                result.getObject(14) == null ? null : result.getLong(14),
+                                result.getInt(15) == 1,
+                                result.getInt(16) == 1,
+                                result.getString(17)));
+                    }
+                }
+            }
+            return rows;
+        }
+    }
+
+    private long insertLoanEvent(long loanId, String playerUuid, String type,
+                                 Long dayIndex, String detail, long now) throws SQLException {
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO loan_events(loan_id, player_uuid, event_type, day_index, detail, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """, Statement.RETURN_GENERATED_KEYS)) {
+                statement.setLong(1, loanId);
+                statement.setString(2, playerUuid == null ? "" : playerUuid);
+                statement.setString(3, type);
+                if (dayIndex == null) {
+                    statement.setNull(4, java.sql.Types.INTEGER);
+                } else {
+                    statement.setLong(4, dayIndex);
+                }
+                statement.setString(5, detail == null ? "" : detail);
+                statement.setLong(6, now);
+                statement.executeUpdate();
+                try (ResultSet keys = statement.getGeneratedKeys()) {
+                    return keys.next() ? keys.getLong(1) : -1;
+                }
+            }
+        }
+    }
+
+    private void releaseTimeoutsForLoanLocked(long loanId, long now) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                UPDATE loan_timeouts SET released = 1, released_at = ?
+                WHERE loan_id = ? AND released = 0
+                """)) {
+            statement.setLong(1, now);
+            statement.setLong(2, loanId);
+            statement.executeUpdate();
+        }
+    }
+
     private Optional<SavedLocation> location(String sql, String... parameters) throws SQLException {
         synchronized (lock) {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -2193,6 +2734,15 @@ public final class FbsmpDatabase implements AutoCloseable {
     public record MortgagePayment(String assetKey, long paidMinor, long remainingMinor,
                                  long nextDueAt, int installmentsLeft) {}
     public record SellLine(String id, String itemData, long valueMinor) {}
+    public record LoanRow(long id, String playerUuid, long principalMinor, long interestMinor,
+                          long remainingMinor, long dueAt, String status, long issueDayIndex,
+                          long dueDayIndex, int termDays, long originalRemainingMinor,
+                          String warningState, Long warningSentForDay, Long overdueEventId,
+                          boolean forgiven, boolean settled, String createdCalendarDate) {}
+    public record LoanTimeout(long id, long loanId, String reason, long remainingMinor,
+                              long startedAt, long expiresAt) {}
+    public record Notice(long id, String type, String message) {}
+    public record AuditRow(String actorName, String action, String target, String reason, long createdAt) {}
     private record ExpiredOrder(long id, UUID requester, long rewardMinor) {}
     private record ExpiredAuction(long id, UUID seller, String itemData) {}
 }

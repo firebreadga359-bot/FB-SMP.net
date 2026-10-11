@@ -5,6 +5,7 @@ import net.firebreadmc.fbsmp.common.Money;
 import net.firebreadmc.fbsmp.paper.FbsmpPlugin;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
+import net.firebreadmc.fbsmp.paper.loan.LoanService;
 import net.firebreadmc.fbsmp.paper.menus.SellMenu;
 import net.firebreadmc.fbsmp.paper.menus.ShopMenu;
 import net.firebreadmc.fbsmp.paper.menus.MortgageMenu;
@@ -29,6 +30,7 @@ import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
@@ -40,14 +42,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 
 public final class CommandRouter implements CommandExecutor {
-    private static final Map<Material, Long> BASIC_SHOP = Map.of(
-            Material.TORCH, 25L,
-            Material.BREAD, 40L,
-            Material.COBBLESTONE, 15L,
-            Material.OAK_LOG, 100L,
-            Material.IRON_INGOT, 400L,
-            Material.GOLD_INGOT, 600L
-    );
     private final FbsmpPlugin plugin;
     private final FbsmpDatabase database;
     private final Map<UUID, TeleportRequest> requestsByRecipient = new ConcurrentHashMap<>();
@@ -60,10 +54,12 @@ public final class CommandRouter implements CommandExecutor {
     private final WarpMenu warpMenu;
     private final SettingsMenu settingsMenu;
     private final AuctionMenu auctionMenu;
+    private final LoanService loanService;
 
     public CommandRouter(FbsmpPlugin plugin, FbsmpDatabase database, PlayerListener listener,
                          SellMenu sellMenu, ShopMenu shopMenu, MortgageMenu mortgageMenu,
-                         WarpMenu warpMenu, SettingsMenu settingsMenu, AuctionMenu auctionMenu) {
+                         WarpMenu warpMenu, SettingsMenu settingsMenu, AuctionMenu auctionMenu,
+                         LoanService loanService) {
         this.plugin = plugin;
         this.database = database;
         this.listener = listener;
@@ -73,6 +69,7 @@ public final class CommandRouter implements CommandExecutor {
         this.warpMenu = warpMenu;
         this.settingsMenu = settingsMenu;
         this.auctionMenu = auctionMenu;
+        this.loanService = loanService;
     }
 
     @Override
@@ -532,7 +529,7 @@ public final class CommandRouter implements CommandExecutor {
             return;
         }
         Material material = Material.matchMaterial(args[1].toUpperCase(Locale.ROOT));
-        Long unitPrice = material == null ? null : shopPrices().get(material);
+        Long unitPrice = material == null ? null : shopMenu.buyPrice(material.name());
         if (material == null || unitPrice == null) {
             player.sendMessage(color("&cThat item is not currently sold by the shop."));
             return;
@@ -720,65 +717,146 @@ public final class CommandRouter implements CommandExecutor {
             sender.sendMessage("This command is for players.");
             return;
         }
-        if (args.length == 0 || args[0].equalsIgnoreCase("vu")) {
-            query(player, () -> database.loanSummary(player.getUniqueId()), (target, summary) -> {
-                target.sendMessage(color("&6Loans: &f" + summary.activeCount() + " active &8| &6Outstanding: &f"
-                        + Money.format(summary.outstandingMinor())));
-                if (summary.nearestDueAt() > 0) {
-                    target.sendMessage(color("&7Nearest due date: &f" + FbCalendar.date(summary.nearestDueAt(),
-                            plugin.getConfig().getInt("calendar.day-length-minutes", 30), 29)));
+        if (loanService == null) {
+            player.sendMessage(color("&cThe loan system is not available right now."));
+            return;
+        }
+        if (args.length == 0 || args[0].equalsIgnoreCase("vu") || args[0].equalsIgnoreCase("info")) {
+            showLoanInfo(player);
+            return;
+        }
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        if (sub.equals("repay")) {
+            long amount = args.length >= 2 ? parseAmount(player, args[1]) : -1;
+            if (args.length < 2) {
+                amount = Long.MAX_VALUE; // repay as much as possible
+            }
+            if (amount == -1) {
+                return;
+            }
+            final long requested = amount;
+            query(player, () -> {
+                long outstanding = database.loanOutstanding(player.getUniqueId());
+                long payable = Math.min(requested, outstanding);
+                if (payable <= 0) {
+                    return 0L;
                 }
-                target.sendMessage(color("&7Use &f/loan take <amount> &7or &f/loan repay <amount>&7."));
+                return loanService.repay(player.getUniqueId(), payable);
+            }, (target, paid) -> {
+                if (paid < 0) {
+                    target.sendMessage(color("&cInsufficient funds."));
+                } else if (paid == 0) {
+                    target.sendMessage(color("&cNo active loan balance was found."));
+                } else {
+                    target.sendMessage(color("&aLoan repayment posted: &6" + Money.format(paid)
+                            + "&a. Remaining: &6" + Money.format(Math.max(0, currentOutstanding(target)
+                            - paid))));
+                    listener.deliverMailbox(player);
+                }
             });
             return;
         }
-        if (args.length != 2) {
-            player.sendMessage(color("&cUsage: /loan <take|repay> <amount>"));
+        if (!sub.equals("take") && !sub.equals("borrow")) {
+            player.sendMessage(color("&cUsage: /loan <take|repay|info> [amount]"));
             return;
         }
-        final long amount;
+        if (args.length != 2) {
+            player.sendMessage(color("&cUsage: /loan take <amount>"));
+            return;
+        }
+        long amount = parseAmount(player, args[1]);
+        if (amount <= 0) {
+            return;
+        }
+        if (amount > loanService.maximumOutstanding()) {
+            player.sendMessage(color("&cThat request exceeds the configured loan limit of &6"
+                    + Money.format(loanService.maximumOutstanding()) + "&c."));
+            return;
+        }
+        boolean bypass = player.hasPermission("fbsmp.loan.limit.bypass");
+        query(player, () -> {
+            if (loanService.requireClearTimeoutToBorrow()
+                    && !bypass && loanService.isTimedOut(player.getUniqueId())) {
+                return -2L;
+            }
+            return loanService.issue(player.getUniqueId(), amount, bypass);
+        }, (target, loanId) -> {
+            if (loanId == -2L) {
+                target.sendMessage(color("&cYou are currently timed out. Clear your overdue loan first."));
+            } else if (loanId < 0) {
+                target.sendMessage(color("&cLoan limit reached or the loan could not be issued."));
+            } else {
+                LoanService.LoanTerms terms = loanService.termsFor(amount);
+                target.sendMessage(color("&aLoan #" + loanId + " issued: &6" + Money.format(amount)
+                        + " &7principal, &f" + Money.format(terms.interestMinor()) + " &7interest, due &f"
+                        + loanService.calendar().format(
+                                loanService.calendar().fromDayIndex(terms.dueDayIndex())) + "&a."));
+                loanService.audit(player.getUniqueId(), player.getName(), "LOAN_ISSUE",
+                        "loan#" + loanId, "", "principal=" + amount, "player request");
+            }
+        });
+    }
+
+    private long currentOutstanding(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            return 0;
+        }
         try {
-            amount = Money.parseMinorUnits(args[1]);
+            return database.loanOutstanding(player.getUniqueId());
+        } catch (Exception exception) {
+            return 0;
+        }
+    }
+
+    private long parseAmount(Player player, String raw) {
+        try {
+            long amount = Money.parseMinorUnits(raw);
+            if (amount <= 0) {
+                player.sendMessage(color("&cAmount must be positive."));
+                return -1;
+            }
+            return amount;
         } catch (IllegalArgumentException exception) {
             player.sendMessage(color("&c" + exception.getMessage()));
-            return;
+            return -1;
         }
-        if (args[0].equalsIgnoreCase("repay")) {
-            query(player, () -> database.repayLoans(player.getUniqueId(), amount, System.currentTimeMillis()),
-                    (target, paid) -> target.sendMessage(color(paid < 0
-                            ? "&cInsufficient funds."
-                            : paid == 0 ? "&cNo active loan balance was found."
-                            : "&aLoan repayment posted: &6" + Money.format(paid))));
-            return;
-        }
-        if (!args[0].equalsIgnoreCase("take")) {
-            player.sendMessage(color("&cUsage: /loan <take|repay> <amount>"));
-            return;
-        }
-        YamlConfiguration config = featureConfig("loans");
-        long maximum;
-        try {
-            maximum = Money.parseMinorUnits(config.getString("maximum-principal", "1000000.00"));
-        } catch (IllegalArgumentException exception) {
-            player.sendMessage(color("&cLoan configuration has an invalid maximum principal."));
-            return;
-        }
-        if (amount > maximum) {
-            player.sendMessage(color("&cThat request exceeds the configured loan limit of &6"
-                    + Money.format(maximum) + "&c."));
-            return;
-        }
-        long interest = percentage(amount, config.getDouble("interest-rate-percent", 8));
-        long dueAt = System.currentTimeMillis() + Math.max(1, config.getLong("repayment-days", 30))
-                * (long) plugin.getConfig().getInt("calendar.day-length-minutes", 30) * 60_000L;
-        long outstandingLimit = player.hasPermission("fbsmp.loan.limit.bypass")
-                ? Long.MAX_VALUE : maximum;
-        query(player, () -> database.issueLoan(player.getUniqueId(), amount, interest,
-                outstandingLimit, dueAt, System.currentTimeMillis()), (target, issued) ->
-                target.sendMessage(color(issued
-                        ? "&aLoan issued: &6" + Money.format(amount) + " &7with &f"
-                            + Money.format(interest) + " &7interest."
-                        : "&cLoan limit reached or the loan could not be issued.")));
+    }
+
+    private void showLoanInfo(Player player) {
+        query(player, () -> {
+            List<FbsmpDatabase.LoanRow> loans = database.loansFor(player.getUniqueId());
+            long today = loanService.todayIndex();
+            List<String> lines = new ArrayList<>();
+            for (FbsmpDatabase.LoanRow loan : loans) {
+                if ("PAID".equals(loan.status())) {
+                    continue;
+                }
+                long daysLeft = loan.dueDayIndex() - today;
+                lines.add("&7#" + loan.id() + " &f" + Money.format(loan.remainingMinor()) + " &7"
+                        + loan.status().toLowerCase(Locale.ROOT) + " &8| due &f"
+                        + loanService.calendar().format(loanService.calendar().fromDayIndex(loan.dueDayIndex()))
+                        + " &8(" + (daysLeft >= 0 ? daysLeft + "d left" : Math.abs(daysLeft) + "d overdue") + ")");
+            }
+            FbsmpDatabase.LoanTimeout timeout = database.activeTimeout(player.getUniqueId(),
+                    System.currentTimeMillis());
+            return new Object[]{lines, timeout};
+        }, (target, payload) -> {
+            @SuppressWarnings("unchecked")
+            List<String> lines = (List<String>) payload[0];
+            FbsmpDatabase.LoanTimeout timeout = (FbsmpDatabase.LoanTimeout) payload[1];
+            if (lines.isEmpty()) {
+                target.sendMessage(color("&6Loans: &fno active loans."));
+            } else {
+                target.sendMessage(color("&6Active loans:"));
+                lines.forEach(line -> target.sendMessage(color(line)));
+            }
+            if (timeout != null) {
+                long seconds = Math.max(0, (timeout.expiresAt() - System.currentTimeMillis()) / 1000);
+                target.sendMessage(color("&cTimed out for &f" + (seconds / 60) + "m " + (seconds % 60)
+                        + "s&c: " + timeout.reason()));
+            }
+            target.sendMessage(color("&7Use &f/loan take <amount> &7or &f/loan repay [amount]&7."));
+        });
     }
 
     private void mortgage(CommandSender sender, String[] args) {
@@ -1107,32 +1185,6 @@ public final class CommandRouter implements CommandExecutor {
         });
     }
 
-    private Map<Material, Long> shopPrices() {
-        YamlConfiguration config = featureConfig("shop");
-        ConfigurationSection prices = config.getConfigurationSection("prices");
-        if (prices == null) {
-            return BASIC_SHOP;
-        }
-        Map<Material, Long> parsed = new java.util.LinkedHashMap<>();
-        for (String name : prices.getKeys(false)) {
-            Material material = Material.matchMaterial(name.toUpperCase(Locale.ROOT));
-            if (material == null || material.isAir()) {
-                plugin.getLogger().warning("Ignoring invalid shop material: " + name);
-                continue;
-            }
-            try {
-                long price = Money.parseMinorUnits(prices.getString(name));
-                if (price <= 0) {
-                    throw new IllegalArgumentException("price must be positive");
-                }
-                parsed.put(material, price);
-            } catch (IllegalArgumentException exception) {
-                plugin.getLogger().warning("Ignoring invalid shop price for " + name + ": " + exception.getMessage());
-            }
-        }
-        return Map.copyOf(parsed);
-    }
-
     private YamlConfiguration featureConfig(String name) {
         File file = new File(plugin.getDataFolder(), name + ".yml");
         return YamlConfiguration.loadConfiguration(file);
@@ -1195,7 +1247,136 @@ public final class CommandRouter implements CommandExecutor {
             case "player" -> adminPlayer(sender, args, false);
             case "economy" -> adminPlayer(sender, args, true);
             case "warp" -> adminWarp(sender, args);
-            default -> sender.sendMessage(color("&7Usage: /fbsmp <version|backup|reload|debug|database|player|economy|calendar|warp>"));
+            case "loan" -> adminLoan(sender, args);
+            case "audit" -> query(sender, () -> database.recentAuditLog(50), (target, rows) -> {
+                target.sendMessage(color("&6Recent audit entries: &f" + rows.size()));
+                for (FbsmpDatabase.AuditRow row : rows) {
+                    target.sendMessage(color("&7" + FbCalendar.isoTimestamp(row.createdAt()) + " &f"
+                            + row.actorName() + " &7" + row.action() + " &f" + row.target()
+                            + (row.reason().isBlank() ? "" : " &8(" + row.reason() + ")")));
+                }
+            });
+            default -> sender.sendMessage(color("&7Usage: /fbsmp <version|backup|reload|debug|database|player|economy|calendar|warp|loan|audit>"));
+        }
+    }
+
+    private void adminLoan(CommandSender sender, String[] args) {
+        if (loanService == null) {
+            sender.sendMessage(color("&cThe loan system is not available right now."));
+            return;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(color("&7Usage: /fbsmp loan <list|info|forgive|settle|adjust|releasetimeouts> [args]"));
+            return;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        switch (action) {
+            case "list" -> query(sender, database::activeLoans, (target, loans) -> {
+                target.sendMessage(color("&6Active loans: &f" + loans.size()));
+                for (FbsmpDatabase.LoanRow loan : loans) {
+                    target.sendMessage(color("&7#" + loan.id() + " &f" + loan.playerUuid() + " &7"
+                            + Money.format(loan.remainingMinor()) + " " + loan.status()));
+                }
+            });
+            case "info" -> {
+                long loanId = parseLong(sender, args, 2);
+                if (loanId < 0) {
+                    return;
+                }
+                query(sender, () -> database.loanById(loanId), (target, loan) -> {
+                    if (loan == null) {
+                        target.sendMessage(color("&cNo such loan."));
+                    } else {
+                        target.sendMessage(color("&6Loan #" + loan.id() + " &f" + loan.playerUuid()
+                                + " &7status &f" + loan.status() + " &7remaining &f"
+                                + Money.format(loan.remainingMinor()) + " &7original &f"
+                                + Money.format(loan.originalRemainingMinor()) + " &7term &f"
+                                + loan.termDays() + "d"));
+                    }
+                });
+            }
+            case "forgive" -> {
+                long loanId = parseLong(sender, args, 2);
+                if (loanId < 0) {
+                    return;
+                }
+                String reason = args.length >= 4 ? args[3] : "admin forgive";
+                query(sender, () -> {
+                    boolean changed = database.forgiveLoan(loanId, reason, System.currentTimeMillis());
+                    loanService.audit(null, sender.getName(), "LOAN_FORGIVE", "loan#" + loanId, "", "", reason);
+                    return changed;
+                }, (target, changed) -> target.sendMessage(color(changed
+                        ? "&aLoan forgiven and timeouts released." : "&cLoan not found or already settled.")));
+            }
+            case "settle" -> {
+                long loanId = parseLong(sender, args, 2);
+                if (loanId < 0) {
+                    return;
+                }
+                String reason = args.length >= 4 ? args[3] : "admin settle";
+                query(sender, () -> {
+                    boolean changed = database.settleLoan(loanId, reason, System.currentTimeMillis());
+                    loanService.audit(null, sender.getName(), "LOAN_SETTLE", "loan#" + loanId, "", "", reason);
+                    return changed;
+                }, (target, changed) -> target.sendMessage(color(changed
+                        ? "&aLoan settled and timeouts released." : "&cLoan not found or already settled.")));
+            }
+            case "adjust" -> {
+                if (args.length < 4) {
+                    sender.sendMessage(color("&7Usage: /fbsmp loan adjust <loanId> <newRemaining> [reason]"));
+                    return;
+                }
+                long loanId = parseLong(sender, args, 2);
+                long newRemaining = parseMinor(sender, args[3]);
+                if (loanId < 0 || newRemaining < 0) {
+                    return;
+                }
+                String reason = args.length >= 5 ? args[4] : "admin adjust";
+                query(sender, () -> {
+                    boolean changed = database.adjustLoanRemaining(loanId, newRemaining, reason,
+                            System.currentTimeMillis());
+                    loanService.audit(null, sender.getName(), "LOAN_ADJUST", "loan#" + loanId, "",
+                            "remaining=" + newRemaining, reason);
+                    return changed;
+                }, (target, changed) -> target.sendMessage(color(changed
+                        ? "&aLoan remaining balance adjusted." : "&cLoan not found.")));
+            }
+            case "releasetimeouts" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(color("&7Usage: /fbsmp loan releasetimeouts <player>"));
+                    return;
+                }
+                org.bukkit.OfflinePlayer offline = Bukkit.getOfflinePlayer(args[2]);
+                query(sender, () -> database.releaseTimeoutsForPaidLoans(offline.getUniqueId(),
+                        System.currentTimeMillis()), (target, released) -> {
+                    loanService.audit(null, sender.getName(), "LOAN_TIMEOUT_RELEASE", args[2],
+                            "", "", "manual release");
+                    target.sendMessage(color("&aReleased &f" + released + "&a timeout(s)."));
+                });
+            }
+            default -> sender.sendMessage(color("&7Usage: /fbsmp loan <list|info|forgive|settle|adjust|releasetimeouts> [args]"));
+        }
+    }
+
+    private long parseLong(CommandSender sender, String[] args, int index) {
+        if (args.length <= index) {
+            sender.sendMessage(color("&cMissing loan id."));
+            return -1;
+        }
+        try {
+            return Long.parseLong(args[index]);
+        } catch (NumberFormatException exception) {
+            sender.sendMessage(color("&cLoan id must be a number."));
+            return -1;
+        }
+    }
+
+    private long parseMinor(CommandSender sender, String raw) {
+        try {
+            return Money.parseMinorUnits(raw);
+        } catch (IllegalArgumentException exception) {
+            sender.sendMessage(color("&c" + exception.getMessage()));
+            return -1;
         }
     }
 
