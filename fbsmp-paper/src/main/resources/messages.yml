@@ -1,3 +1,29 @@
 prefix: "&8[&6FB-SMP&8] &r"
 no-permission: "&cYou do not have permission to do that."
 player-only: "&cThat command can only be used in-game."
+shop:
+  usage: "&cUsage: /shop buy <item> [quantity]"
+  not-sold: "&cThat item is not currently sold by the shop."
+  quantity-invalid: "&cQuantity must be a whole number."
+  quantity-range: "&cQuantity must be between 1 and 64."
+  amount-range: "&cThat purchase amount is outside the supported range."
+  insufficient-funds: "&cYou do not have enough funds for {amount}."
+  purchased: "&aPurchased {count}x {item} for &6{amount}&a."
+loan:
+  unavailable: "&cThe loan system is not available right now."
+  usage: "&cUsage: /loan <take|repay|info> [amount]"
+  take:
+    usage: "&cUsage: /loan take <amount>"
+  limit-exceeded: "&cThat request exceeds the configured loan limit of &6{limit}&c."
+  timed-out: "&cYou are currently timed out. Clear your overdue loan first."
+  issue-failed: "&cLoan limit reached or the loan could not be issued."
+  issued: "&aLoan #{id} issued: &6{amount} &7principal, &f{interest} &7interest, due &f{due}&a."
+  repay:
+    insufficient: "&cInsufficient funds."
+    none: "&cNo active loan balance was found."
+    posted: "&aLoan repayment posted: &6{amount}&a. Remaining: &6{remaining}"
+  info:
+    none: "&6Loans: &fno active loans."
+    header: "&6Active loans:"
+    timeout: "&cTimed out for &f{time}&c: {reason}"
+    footer: "&7Use &f/loan take <amount> &7or &f/loan repay [amount]&7."

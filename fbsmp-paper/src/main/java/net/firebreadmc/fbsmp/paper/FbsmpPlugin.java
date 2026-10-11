@@ -6,6 +6,7 @@ import net.firebreadmc.fbsmp.paper.commands.CommandRouter;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
 import net.firebreadmc.fbsmp.paper.loan.LoanService;
+import net.firebreadmc.fbsmp.paper.messages.Messages;
 import net.firebreadmc.fbsmp.paper.sell.SellService;
 import net.firebreadmc.fbsmp.paper.listeners.ModerationListener;
 import net.firebreadmc.fbsmp.paper.menus.ShopMenu;
@@ -25,6 +26,7 @@ import java.util.Objects;
 public final class FbsmpPlugin extends JavaPlugin {
     private FbsmpDatabase database;
     private PrivateAdminPanel adminPanel;
+    private Messages messages;
     private long startedAtMillis;
 
     @Override
@@ -73,8 +75,9 @@ public final class FbsmpPlugin extends JavaPlugin {
         } catch (SQLException exception) {
             getLogger().severe("Could not initialise the loan service: " + exception.getMessage());
         }
+        messages = new Messages(this);
         CommandRouter router = new CommandRouter(this, database, playerListener, sellMenu, shopMenu,
-                mortgageMenu, warpMenu, settingsMenu, auctionMenu, loanService);
+                mortgageMenu, warpMenu, settingsMenu, auctionMenu, loanService, messages);
         for (String commandName : new String[]{
                 "bal", "baltop", "pay", "sethome", "home", "homes", "delhome", "warp", "rtpq",
                 "tpa", "tpahere", "tpaccept", "tpdeny", "msg", "reply", "ignore", "stats", "settings",

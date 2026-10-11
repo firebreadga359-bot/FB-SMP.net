@@ -10,6 +10,7 @@ import net.firebreadmc.fbsmp.paper.FbsmpPlugin;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
 import net.firebreadmc.fbsmp.paper.loan.LoanService;
+import net.firebreadmc.fbsmp.paper.messages.Messages;
 import net.firebreadmc.fbsmp.paper.menus.SellMenu;
 import net.firebreadmc.fbsmp.paper.menus.ShopMenu;
 import net.firebreadmc.fbsmp.paper.menus.MortgageMenu;
@@ -59,11 +60,12 @@ public final class CommandRouter implements CommandExecutor {
     private final SettingsMenu settingsMenu;
     private final AuctionMenu auctionMenu;
     private final LoanService loanService;
+    private final Messages messages;
 
     public CommandRouter(FbsmpPlugin plugin, FbsmpDatabase database, PlayerListener listener,
                          SellMenu sellMenu, ShopMenu shopMenu, MortgageMenu mortgageMenu,
                          WarpMenu warpMenu, SettingsMenu settingsMenu, AuctionMenu auctionMenu,
-                         LoanService loanService) {
+                         LoanService loanService, Messages messages) {
         this.plugin = plugin;
         this.database = database;
         this.listener = listener;
@@ -74,6 +76,7 @@ public final class CommandRouter implements CommandExecutor {
         this.settingsMenu = settingsMenu;
         this.auctionMenu = auctionMenu;
         this.loanService = loanService;
+        this.messages = messages;
     }
 
     @Override
@@ -531,13 +534,13 @@ public final class CommandRouter implements CommandExecutor {
             return;
         }
         if (args.length < 2 || !args[0].equalsIgnoreCase("buy")) {
-            player.sendMessage(color("&cUsage: /shop buy <item> [quantity]"));
+            player.sendMessage(msg("shop.usage", "&cUsage: /shop buy <item> [quantity]"));
             return;
         }
         Material material = Material.matchMaterial(args[1].toUpperCase(Locale.ROOT));
         Long unitPrice = material == null ? null : shopMenu.buyPrice(material.name());
         if (material == null || unitPrice == null) {
-            player.sendMessage(color("&cThat item is not currently sold by the shop."));
+            player.sendMessage(msg("shop.not-sold", "&cThat item is not currently sold by the shop."));
             return;
         }
         int quantity = 1;
@@ -545,19 +548,19 @@ public final class CommandRouter implements CommandExecutor {
             try {
                 quantity = Integer.parseInt(args[2]);
             } catch (NumberFormatException exception) {
-                player.sendMessage(color("&cQuantity must be a whole number."));
+                player.sendMessage(msg("shop.quantity-invalid", "&cQuantity must be a whole number."));
                 return;
             }
         }
         if (quantity < 1 || quantity > 64) {
-            player.sendMessage(color("&cQuantity must be between 1 and 64."));
+            player.sendMessage(msg("shop.quantity-range", "&cQuantity must be between 1 and 64."));
             return;
         }
         long total;
         try {
             total = Math.multiplyExact(unitPrice, quantity);
         } catch (ArithmeticException exception) {
-            player.sendMessage(color("&cThat purchase amount is outside the supported range."));
+            player.sendMessage(msg("shop.amount-range", "&cThat purchase amount is outside the supported range."));
             return;
         }
         Material purchased = material;
@@ -570,12 +573,16 @@ public final class CommandRouter implements CommandExecutor {
                 return;
             }
             if (!paid) {
-                targetPlayer.sendMessage(color("&cYou do not have enough funds for " + Money.format(total) + "."));
+                targetPlayer.sendMessage(msg("shop.insufficient-funds",
+                        "&cYou do not have enough funds for " + Money.format(total) + ".",
+                        Map.of("amount", Money.format(total))));
                 return;
             }
             listener.deliverMailbox(targetPlayer);
-            targetPlayer.sendMessage(color("&aPurchased " + count + "x " + purchased.name() + " for &6"
-                    + Money.format(total) + "&a."));
+            targetPlayer.sendMessage(msg("shop.purchased", "&aPurchased " + count + "x " + purchased.name()
+                    + " for &6" + Money.format(total) + "&a.",
+                    Map.of("count", String.valueOf(count), "item", purchased.name(),
+                            "amount", Money.format(total))));
         });
     }
 
@@ -724,7 +731,7 @@ public final class CommandRouter implements CommandExecutor {
             return;
         }
         if (loanService == null) {
-            player.sendMessage(color("&cThe loan system is not available right now."));
+            player.sendMessage(msg("loan.unavailable", "&cThe loan system is not available right now."));
             return;
         }
         if (args.length == 0 || args[0].equalsIgnoreCase("vu") || args[0].equalsIgnoreCase("info")) {
@@ -750,24 +757,26 @@ public final class CommandRouter implements CommandExecutor {
                 return loanService.repay(player.getUniqueId(), payable);
             }, (target, paid) -> {
                 if (paid < 0) {
-                    target.sendMessage(color("&cInsufficient funds."));
+                    target.sendMessage(msg("loan.repay.insufficient", "&cInsufficient funds."));
                 } else if (paid == 0) {
-                    target.sendMessage(color("&cNo active loan balance was found."));
+                    target.sendMessage(msg("loan.repay.none", "&cNo active loan balance was found."));
                 } else {
-                    target.sendMessage(color("&aLoan repayment posted: &6" + Money.format(paid)
+                    target.sendMessage(msg("loan.repay.posted", "&aLoan repayment posted: &6" + Money.format(paid)
                             + "&a. Remaining: &6" + Money.format(Math.max(0, currentOutstanding(target)
-                            - paid))));
+                            - paid)),
+                            Map.of("amount", Money.format(paid),
+                                    "remaining", Money.format(Math.max(0, currentOutstanding(target) - paid)))));
                     listener.deliverMailbox(player);
                 }
             });
             return;
         }
         if (!sub.equals("take") && !sub.equals("borrow")) {
-            player.sendMessage(color("&cUsage: /loan <take|repay|info> [amount]"));
+            player.sendMessage(msg("loan.usage", "&cUsage: /loan <take|repay|info> [amount]"));
             return;
         }
         if (args.length != 2) {
-            player.sendMessage(color("&cUsage: /loan take <amount>"));
+            player.sendMessage(msg("loan.take.usage", "&cUsage: /loan take <amount>"));
             return;
         }
         long amount = parseAmount(player, args[1]);
@@ -775,8 +784,9 @@ public final class CommandRouter implements CommandExecutor {
             return;
         }
         if (amount > loanService.maximumOutstanding()) {
-            player.sendMessage(color("&cThat request exceeds the configured loan limit of &6"
-                    + Money.format(loanService.maximumOutstanding()) + "&c."));
+            player.sendMessage(msg("loan.limit-exceeded", "&cThat request exceeds the configured loan limit of &6"
+                    + Money.format(loanService.maximumOutstanding()) + "&c.",
+                    Map.of("limit", Money.format(loanService.maximumOutstanding()))));
             return;
         }
         boolean bypass = player.hasPermission("fbsmp.loan.limit.bypass");
@@ -788,15 +798,19 @@ public final class CommandRouter implements CommandExecutor {
             return loanService.issue(player.getUniqueId(), amount, bypass);
         }, (target, loanId) -> {
             if (loanId == -2L) {
-                target.sendMessage(color("&cYou are currently timed out. Clear your overdue loan first."));
+                target.sendMessage(msg("loan.timed-out", "&cYou are currently timed out. Clear your overdue loan first."));
             } else if (loanId < 0) {
-                target.sendMessage(color("&cLoan limit reached or the loan could not be issued."));
+                target.sendMessage(msg("loan.issue-failed", "&cLoan limit reached or the loan could not be issued."));
             } else {
                 LoanService.LoanTerms terms = loanService.termsFor(amount);
-                target.sendMessage(color("&aLoan #" + loanId + " issued: &6" + Money.format(amount)
+                target.sendMessage(msg("loan.issued", "&aLoan #" + loanId + " issued: &6" + Money.format(amount)
                         + " &7principal, &f" + Money.format(terms.interestMinor()) + " &7interest, due &f"
                         + loanService.calendar().format(
-                                loanService.calendar().fromDayIndex(terms.dueDayIndex())) + "&a."));
+                                loanService.calendar().fromDayIndex(terms.dueDayIndex())) + "&a.",
+                        Map.of("id", String.valueOf(loanId), "amount", Money.format(amount),
+                                "interest", Money.format(terms.interestMinor()),
+                                "due", loanService.calendar().format(
+                                        loanService.calendar().fromDayIndex(terms.dueDayIndex())))));
                 loanService.audit(player.getUniqueId(), player.getName(), "LOAN_ISSUE",
                         "loan#" + loanId, "", "principal=" + amount, "player request");
             }
@@ -851,17 +865,19 @@ public final class CommandRouter implements CommandExecutor {
             List<String> lines = (List<String>) payload[0];
             FbsmpDatabase.LoanTimeout timeout = (FbsmpDatabase.LoanTimeout) payload[1];
             if (lines.isEmpty()) {
-                target.sendMessage(color("&6Loans: &fno active loans."));
+                target.sendMessage(msg("loan.info.none", "&6Loans: &fno active loans."));
             } else {
-                target.sendMessage(color("&6Active loans:"));
+                target.sendMessage(msg("loan.info.header", "&6Active loans:"));
                 lines.forEach(line -> target.sendMessage(color(line)));
             }
             if (timeout != null) {
                 long seconds = Math.max(0, (timeout.expiresAt() - System.currentTimeMillis()) / 1000);
-                target.sendMessage(color("&cTimed out for &f" + (seconds / 60) + "m " + (seconds % 60)
-                        + "s&c: " + timeout.reason()));
+                target.sendMessage(msg("loan.info.timeout", "&cTimed out for &f" + (seconds / 60) + "m "
+                        + (seconds % 60) + "s&c: " + timeout.reason(),
+                        Map.of("time", (seconds / 60) + "m " + (seconds % 60) + "s",
+                                "reason", timeout.reason())));
             }
-            target.sendMessage(color("&7Use &f/loan take <amount> &7or &f/loan repay [amount]&7."));
+            target.sendMessage(msg("loan.info.footer", "&7Use &f/loan take <amount> &7or &f/loan repay [amount]&7."));
         });
     }
 
@@ -1244,7 +1260,10 @@ public final class CommandRouter implements CommandExecutor {
             }
             case "reload" -> {
                 plugin.reloadConfig();
-                sender.sendMessage(color("&aFB-SMP config.yml reloaded."));
+                if (messages != null) {
+                    messages.reload();
+                }
+                sender.sendMessage(color("&aFB-SMP config.yml and messages.yml reloaded."));
             }
             case "debug", "database" -> query(sender, database::adminSnapshot, (target, snapshot) ->
                     target.sendMessage(color("&7SQLite database &8| &f" + snapshot.playerCount()
@@ -1722,6 +1741,16 @@ public final class CommandRouter implements CommandExecutor {
 
     private static String color(String value) {
         return ChatColor.translateAlternateColorCodes('&', value);
+    }
+
+    /** Message text from messages.yml, falling back to the built-in default. */
+    private String msg(String key, String fallback) {
+        return messages == null ? color(fallback) : messages.format(key, fallback);
+    }
+
+    /** As {@link #msg}, with {placeholder} values supplied by the caller. */
+    private String msg(String key, String fallback, Map<String, String> placeholders) {
+        return messages == null ? color(fallback) : messages.format(key, fallback, placeholders);
     }
 
     private <T> void query(CommandSender sender, DatabaseWork<T> task, BiConsumer<CommandSender, T> success) {
