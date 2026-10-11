@@ -2,6 +2,7 @@ package net.firebreadmc.fbsmp.paper.commands;
 
 import net.firebreadmc.fbsmp.common.FbCalendar;
 import net.firebreadmc.fbsmp.common.Money;
+import net.firebreadmc.fbsmp.common.shop.ItemCategory;
 import net.firebreadmc.fbsmp.common.shop.PriceRegistry;
 import net.firebreadmc.fbsmp.common.shop.PriceTier;
 import net.firebreadmc.fbsmp.common.shop.PriceValidator;
@@ -11,6 +12,7 @@ import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
 import net.firebreadmc.fbsmp.paper.loan.LoanService;
 import net.firebreadmc.fbsmp.paper.messages.Messages;
+import net.firebreadmc.fbsmp.paper.sell.SellService;
 import net.firebreadmc.fbsmp.paper.menus.SellMenu;
 import net.firebreadmc.fbsmp.paper.menus.ShopMenu;
 import net.firebreadmc.fbsmp.paper.menus.MortgageMenu;
@@ -55,6 +57,7 @@ public final class CommandRouter implements CommandExecutor {
     private final PlayerListener listener;
     private final SellMenu sellMenu;
     private final ShopMenu shopMenu;
+    private final SellService sellService;
     private final MortgageMenu mortgageMenu;
     private final WarpMenu warpMenu;
     private final SettingsMenu settingsMenu;
@@ -65,12 +68,13 @@ public final class CommandRouter implements CommandExecutor {
     public CommandRouter(FbsmpPlugin plugin, FbsmpDatabase database, PlayerListener listener,
                          SellMenu sellMenu, ShopMenu shopMenu, MortgageMenu mortgageMenu,
                          WarpMenu warpMenu, SettingsMenu settingsMenu, AuctionMenu auctionMenu,
-                         LoanService loanService, Messages messages) {
+                         LoanService loanService, Messages messages, SellService sellService) {
         this.plugin = plugin;
         this.database = database;
         this.listener = listener;
         this.sellMenu = sellMenu;
         this.shopMenu = shopMenu;
+        this.sellService = sellService;
         this.mortgageMenu = mortgageMenu;
         this.warpMenu = warpMenu;
         this.settingsMenu = settingsMenu;
@@ -103,7 +107,7 @@ public final class CommandRouter implements CommandExecutor {
             case "settings" -> settings(sender, args);
             case "afk" -> afk(sender);
             case "shop" -> shop(sender, args);
-            case "sell" -> sell(sender);
+            case "sell" -> sell(sender, args);
             case "ah", "aushop" -> auctionHouse(sender, args);
             case "ausell" -> auctionSell(sender, args);
             case "loan" -> loan(sender, args);
@@ -526,15 +530,37 @@ public final class CommandRouter implements CommandExecutor {
 
     private void shop(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("This command is for players.");
+            sender.sendMessage(msg("shop.player-only", "&cThat command can only be used in-game."));
             return;
         }
         if (args.length == 0) {
             shopMenu.openCategories(player);
             return;
         }
-        if (args.length < 2 || !args[0].equalsIgnoreCase("buy")) {
-            player.sendMessage(msg("shop.usage", "&cUsage: /shop buy <item> [quantity]"));
+        switch (args[0].toLowerCase(Locale.ROOT)) {
+            case "buy" -> shopBuy(player, args);
+            case "sell" -> shopSell(player, args);
+            case "price", "info" -> shopPrice(player, args);
+            case "search", "find" -> shopSearch(player, args);
+            case "categories", "category", "cats" -> shopMenu.openCategories(player);
+            case "browse" -> {
+                if (args.length >= 2) {
+                    shopBrowse(player, args[1]);
+                } else {
+                    shopMenu.openCategories(player);
+                }
+            }
+            case "help" -> player.sendMessage(msg("shop.help",
+                    "&6Shop &7| &f/shop &7open  &f/shop buy <item> [qty]  &f/shop sell <item> <qty>  "
+                            + "&f/shop price <item>  &f/shop search <text>  &f/shop browse <category>"));
+            default -> player.sendMessage(msg("shop.usage",
+                    "&cUsage: /shop [buy <item> [qty]|sell <item> <qty>|price <item>|search <text>|browse <category>]"));
+        }
+    }
+
+    private void shopBuy(Player player, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage(msg("shop.buy.usage", "&cUsage: /shop buy <item> [quantity]"));
             return;
         }
         Material material = Material.matchMaterial(args[1].toUpperCase(Locale.ROOT));
@@ -586,12 +612,128 @@ public final class CommandRouter implements CommandExecutor {
         });
     }
 
-    private void sell(CommandSender sender) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("This command is for players.");
+    /** Direct sell-to-shop: prices the held stack, escrows it and credits the player. */
+    private void shopSell(Player player, String[] args) {
+        if (sellMenu == null) {
+            player.sendMessage(msg("shop.sell.unavailable", "&cSelling is not available right now."));
             return;
         }
-        sellMenu.open(player);
+        if (args.length < 3) {
+            player.sendMessage(msg("shop.sell.usage", "&cUsage: /shop sell <item> <quantity>"));
+            return;
+        }
+        Material material = Material.matchMaterial(args[1].toUpperCase(Locale.ROOT));
+        if (material == null || material.isAir()) {
+            player.sendMessage(msg("shop.sell.not-sellable", "&cThat item cannot be sold to the shop."));
+            return;
+        }
+        int quantity;
+        try {
+            quantity = Integer.parseInt(args[2]);
+        } catch (NumberFormatException exception) {
+            player.sendMessage(msg("shop.quantity-invalid", "&cQuantity must be a whole number."));
+            return;
+        }
+        if (quantity < 1) {
+            player.sendMessage(msg("shop.quantity-range", "&cQuantity must be at least 1."));
+            return;
+        }
+        SellService.Offer offer = sellService.offer(0, new ItemStack(material, quantity));
+        if (offer == null) {
+            player.sendMessage(msg("shop.sell.not-sellable", "&cThat item cannot be sold to the shop."));
+            return;
+        }
+        int held = 0;
+        for (ItemStack stack : player.getInventory().getStorageContents()) {
+            if (stack != null && stack.getType() == material) {
+                held += stack.getAmount();
+            }
+        }
+        if (held < quantity) {
+            player.sendMessage(msg("shop.sell.not-held",
+                    "&cYou only have &f{held}&c of &f{item}&c to sell.",
+                    Map.of("held", String.valueOf(held), "item", material.name())));
+            return;
+        }
+        long total = offer.totalValueMinor();
+        int[] remaining = { quantity };
+        for (int slot = 0; slot < 36 && remaining[0] > 0; slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack == null || stack.getType() != material) {
+                continue;
+            }
+            int take = Math.min(stack.getAmount(), remaining[0]);
+            if (take >= stack.getAmount()) {
+                player.getInventory().setItem(slot, null);
+            } else {
+                stack.setAmount(stack.getAmount() - take);
+            }
+            remaining[0] -= take;
+        }
+        player.saveData();
+        query(player, () -> database.credit(player.getUniqueId(), total, "SHOP_SELL",
+                quantity + "x " + material.name(), System.currentTimeMillis()), (target, credited) -> {
+            if (target instanceof Player targetPlayer) {
+                if (credited) {
+                    targetPlayer.sendMessage(msg("shop.sold",
+                            "&aSold " + quantity + "x " + material.name() + " for &6" + Money.format(total) + "&a.",
+                            Map.of("count", String.valueOf(quantity), "item", material.name(),
+                                    "amount", Money.format(total))));
+                } else {
+                    targetPlayer.sendMessage(msg("shop.sell.failed",
+                            "&cThe sale could not be completed; your items were returned."));
+                    targetPlayer.getInventory().addItem(new ItemStack(material, quantity));
+                    targetPlayer.saveData();
+                }
+            }
+        });
+    }
+
+    private void shopPrice(Player player, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage(msg("shop.price.usage", "&cUsage: /shop price <item>"));
+            return;
+        }
+        Material material = Material.matchMaterial(args[1].toUpperCase(Locale.ROOT));
+        if (material == null) {
+            player.sendMessage(msg("shop.not-sold", "&cThat item is not currently sold by the shop."));
+            return;
+        }
+        Long buy = shopMenu.buyPrice(material.name());
+        Long sell = shopMenu.sellPrice(material.name());
+        player.sendMessage(msg("shop.price.line", "&6{item} &8| &7buy &f{buy} &7sell &f{sell}",
+                Map.of("item", material.name(),
+                        "buy", buy == null ? "-" : Money.format(buy),
+                        "sell", sell == null ? "-" : Money.format(sell))));
+    }
+
+    private void shopSearch(Player player, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage(msg("shop.search.usage", "&cUsage: /shop search <text>"));
+            return;
+        }
+        shopMenu.openSearch(player, args[1]);
+    }
+
+    private void shopBrowse(Player player, String rawCategory) {
+        for (ItemCategory category : shopMenu.catalog().playerCategories()) {
+            if (category.name().equalsIgnoreCase(rawCategory)
+                    || category.displayName().equalsIgnoreCase(rawCategory)) {
+                shopMenu.openCategory(player, category, 0);
+                return;
+            }
+        }
+        player.sendMessage(msg("shop.browse.unknown", "&cUnknown category. Try /shop to list them."));
+    }
+
+    private void sell(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(msg("shop.player-only", "&cThat command can only be used in-game."));
+            return;
+        }
+        boolean sellAll = args.length > 0 && (args[0].equalsIgnoreCase("all")
+                || args[0].equalsIgnoreCase("sellall"));
+        sellMenu.openFor(player, sellAll);
     }
 
     private void auctionHouse(CommandSender sender, String[] args) {
@@ -740,39 +882,30 @@ public final class CommandRouter implements CommandExecutor {
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("repay")) {
-            long amount = args.length >= 2 ? parseAmount(player, args[1]) : -1;
-            if (args.length < 2) {
-                amount = Long.MAX_VALUE; // repay as much as possible
-            }
+            long amount = args.length >= 2 ? parseAmount(player, args[1]) : Long.MAX_VALUE;
             if (amount == -1) {
                 return;
             }
-            final long requested = amount;
-            query(player, () -> {
-                long outstanding = database.loanOutstanding(player.getUniqueId());
-                long payable = Math.min(requested, outstanding);
-                if (payable <= 0) {
-                    return 0L;
-                }
-                return loanService.repay(player.getUniqueId(), payable);
-            }, (target, paid) -> {
-                if (paid < 0) {
-                    target.sendMessage(msg("loan.repay.insufficient", "&cInsufficient funds."));
-                } else if (paid == 0) {
-                    target.sendMessage(msg("loan.repay.none", "&cNo active loan balance was found."));
-                } else {
-                    target.sendMessage(msg("loan.repay.posted", "&aLoan repayment posted: &6" + Money.format(paid)
-                            + "&a. Remaining: &6" + Money.format(Math.max(0, currentOutstanding(target)
-                            - paid)),
-                            Map.of("amount", Money.format(paid),
-                                    "remaining", Money.format(Math.max(0, currentOutstanding(target) - paid)))));
-                    listener.deliverMailbox(player);
-                }
-            });
+            loanRepay(player, amount);
+            return;
+        }
+        if (sub.equals("payoff")) {
+            loanRepay(player, Long.MAX_VALUE);
+            return;
+        }
+        if (sub.equals("terms") || sub.equals("quote")) {
+            loanTerms(player, args);
+            return;
+        }
+        if (sub.equals("help")) {
+            player.sendMessage(msg("loan.help",
+                    "&6Loans &7| &f/loan info  &f/loan take <amount>  &f/loan repay [amount]  "
+                            + "&f/loan payoff  &f/loan terms [amount]"));
             return;
         }
         if (!sub.equals("take") && !sub.equals("borrow")) {
-            player.sendMessage(msg("loan.usage", "&cUsage: /loan <take|repay|info> [amount]"));
+            player.sendMessage(msg("loan.usage",
+                    "&cUsage: /loan <take <amount>|repay [amount]|payoff|terms [amount]|info>"));
             return;
         }
         if (args.length != 2) {
@@ -840,6 +973,54 @@ public final class CommandRouter implements CommandExecutor {
             player.sendMessage(color("&c" + exception.getMessage()));
             return -1;
         }
+    }
+
+    private void loanRepay(Player player, long requested) {
+        query(player, () -> {
+            long outstanding = database.loanOutstanding(player.getUniqueId());
+            long payable = Math.min(requested, outstanding);
+            if (payable <= 0) {
+                return 0L;
+            }
+            return loanService.repay(player.getUniqueId(), payable);
+        }, (target, paid) -> {
+            if (paid < 0) {
+                target.sendMessage(msg("loan.repay.insufficient", "&cInsufficient funds."));
+            } else if (paid == 0) {
+                target.sendMessage(msg("loan.repay.none", "&cNo active loan balance was found."));
+            } else {
+                long remaining = Math.max(0, currentOutstanding(target) - paid);
+                target.sendMessage(msg("loan.repay.posted", "&aLoan repayment posted: &6" + Money.format(paid)
+                        + "&a. Remaining: &6" + Money.format(remaining),
+                        Map.of("amount", Money.format(paid), "remaining", Money.format(remaining))));
+                if (remaining == 0) {
+                    target.sendMessage(msg("loan.repay.cleared", "&aThat was your final payment — the loan is cleared."));
+                }
+                listener.deliverMailbox(player);
+            }
+        });
+    }
+
+    private void loanTerms(Player player, String[] args) {
+        long amount;
+        if (args.length >= 2) {
+            amount = parseAmount(player, args[1]);
+            if (amount <= 0) {
+                return;
+            }
+        } else {
+            amount = 100_00L;
+        }
+        LoanService.LoanTerms terms = loanService.termsFor(amount);
+        player.sendMessage(msg("loan.terms.line",
+                "&6Loan quote &8| &7principal &f{principal} &8| &7interest &f{interest} "
+                        + "&8| &7total due &f{total} &8| &7term &f{term}d &8| &7due &f{due}",
+                Map.of("principal", Money.format(terms.principalMinor()),
+                        "interest", Money.format(terms.interestMinor()),
+                        "total", Money.format(terms.totalMinor()),
+                        "term", String.valueOf(terms.termDays()),
+                        "due", loanService.calendar().format(
+                                loanService.calendar().fromDayIndex(terms.dueDayIndex())))));
     }
 
     private void showLoanInfo(Player player) {

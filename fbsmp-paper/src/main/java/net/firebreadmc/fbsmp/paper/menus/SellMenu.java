@@ -76,6 +76,21 @@ public final class SellMenu implements Listener {
         }
     }
 
+    /** Opens the sell menu and, when requested, stages every sellable stack. */
+    public void openFor(Player player, boolean sellAll) {
+        open(player);
+        if (sellAll) {
+            SellSession session = active.get(player.getUniqueId());
+            if (session != null) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline() && active.get(player.getUniqueId()) == session) {
+                        stageSellAll(player, session);
+                    }
+                });
+            }
+        }
+    }
+
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         if (!(event.getView().getTopInventory().getHolder() instanceof SellHolder holder)) {

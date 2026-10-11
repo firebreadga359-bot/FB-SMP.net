@@ -3,6 +3,7 @@ package net.firebreadmc.fbsmp.common.shop;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -19,6 +20,10 @@ public final class ShopCatalog {
                         Long buyMinor, Long sellMinor, boolean restricted, boolean requiresReview) {
         public boolean buyable() {
             return !restricted && buyMinor != null && buyMinor > 0;
+        }
+
+        public boolean sellable() {
+            return !restricted && sellMinor != null && sellMinor > 0;
         }
     }
 
@@ -87,6 +92,59 @@ public final class ShopCatalog {
 
     public int size() {
         return all.size();
+    }
+
+    /** Entries a player may buy, in catalog order. */
+    public List<Entry> buyable() {
+        List<Entry> result = new ArrayList<>();
+        for (Entry entry : all) {
+            if (entry.buyable()) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
+    /** Entries a player may sell to the shop, in catalog order. */
+    public List<Entry> sellable() {
+        List<Entry> result = new ArrayList<>();
+        for (Entry entry : all) {
+            if (entry.sellable()) {
+                result.add(entry);
+            }
+        }
+        return result;
+    }
+
+    /** Exact item-id lookup, or null when the item is not in the catalog. */
+    public Entry find(String itemId) {
+        if (itemId == null) {
+            return null;
+        }
+        for (Entry entry : all) {
+            if (entry.itemId().equals(itemId)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    /** Case-insensitive substring search over item ids, capped for display. */
+    public List<Entry> search(String query, int limit) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        String needle = query.toLowerCase(Locale.ROOT);
+        List<Entry> result = new ArrayList<>();
+        for (Entry entry : all) {
+            if (entry.itemId().contains(needle)) {
+                result.add(entry);
+                if (result.size() >= limit) {
+                    break;
+                }
+            }
+        }
+        return result;
     }
 
     public Page page(ItemCategory category, int pageIndex) {

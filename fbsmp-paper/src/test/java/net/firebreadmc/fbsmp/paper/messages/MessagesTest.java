@@ -66,6 +66,23 @@ class MessagesTest {
     }
 
     @Test
+    void shippedResourceLoadsAndResolvesNestedKeys(@TempDir Path dataFolder) throws Exception {
+        // Loads the real shipped file through the real loader: catches YAML errors and
+        // proves nested keys (shop.sell.usage, loan.terms.line, ...) actually resolve.
+        var resource = MessagesTest.class.getClassLoader().getResourceAsStream("messages.yml");
+        assertTrue(resource != null, "messages.yml must ship in the plugin resources");
+        Path file = dataFolder.resolve("messages.yml");
+        try (var in = resource) {
+            Files.write(file, in.readAllBytes());
+        }
+        Messages messages = new Messages(file.toFile());
+        assertEquals(ChatColor.translateAlternateColorCodes('&', "&cUsage: /shop sell <item> <quantity>"),
+                messages.format("shop.sell.usage", "fallback"));
+        assertTrue(messages.format("loan.terms.line", "fallback").contains("Loan quote"));
+        assertTrue(messages.format("shop.help", "fallback").contains("/shop"));
+    }
+
+    @Test
     void shippedResourceContainsEveryWiredKey() throws Exception {
         // Guards against wiring a key in code that never lands in messages.yml.
         var resource = MessagesTest.class.getClassLoader().getResourceAsStream("messages.yml");
@@ -76,12 +93,15 @@ class MessagesTest {
         }
         for (String key : new String[]{
                 "prefix", "no-permission", "player-only",
-                "shop.usage", "shop.not-sold", "shop.quantity-invalid", "shop.quantity-range",
-                "shop.amount-range", "shop.insufficient-funds", "shop.purchased",
-                "loan.unavailable", "loan.usage", "loan.take.usage", "loan.limit-exceeded",
-                "loan.timed-out", "loan.issue-failed", "loan.issued", "loan.repay.insufficient",
-                "loan.repay.none", "loan.repay.posted", "loan.info.none", "loan.info.header",
-                "loan.info.timeout", "loan.info.footer"
+                "shop.player-only", "shop.help", "shop.usage", "shop.not-sold", "shop.quantity-invalid",
+                "shop.quantity-range", "shop.amount-range", "shop.insufficient-funds", "shop.purchased",
+                "shop.sold", "shop.buy.usage", "shop.sell.unavailable", "shop.sell.usage",
+                "shop.sell.not-sellable", "shop.sell.not-held", "shop.sell.failed", "shop.price.usage",
+                "shop.price.line", "shop.search.usage", "shop.browse.unknown",
+                "loan.unavailable", "loan.help", "loan.usage", "loan.take.usage", "loan.limit-exceeded",
+                "loan.timed-out", "loan.issue-failed", "loan.issued", "loan.terms.line",
+                "loan.repay.insufficient", "loan.repay.none", "loan.repay.posted", "loan.repay.cleared",
+                "loan.info.none", "loan.info.header", "loan.info.timeout", "loan.info.footer"
         }) {
             String leaf = key.contains(".") ? key.substring(key.lastIndexOf('.') + 1) : key;
             assertTrue(yaml.contains(leaf + ":"), "messages.yml is missing key " + key);

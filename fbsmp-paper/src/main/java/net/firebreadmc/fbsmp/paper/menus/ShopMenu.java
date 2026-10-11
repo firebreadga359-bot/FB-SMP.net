@@ -47,6 +47,7 @@ public final class ShopMenu implements Listener {
     private static final int NEXT_SLOT = 53;
     private static final int BACK_SLOT = 49;
     private static final int MAX_QUANTITY = 2304;
+    private static final int MAX_SEARCH_RESULTS = 900;
 
     private final FbsmpPlugin plugin;
     private final FbsmpDatabase database;
@@ -96,6 +97,43 @@ public final class ShopMenu implements Listener {
         Inventory inventory = Bukkit.createInventory(holder, SIZE, ChatColor.GOLD + "FB-SMP Shop");
         holder.inventory = inventory;
         paintCategories(holder);
+        player.openInventory(inventory);
+    }
+
+    /** Opens a filtered listing for a search term; falls back to categories when empty. */
+    public void openSearch(Player player, String query) {
+        List<ShopCatalog.Entry> matches = loaded.catalog().search(query, MAX_SEARCH_RESULTS);
+        if (matches.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "No shop items match \"" + query + "\".");
+            return;
+        }
+        ItemsHolder holder = new ItemsHolder(player.getUniqueId(), ItemCategory.MISC, 0);
+        holder.customEntries = matches;
+        holder.title = ChatColor.GOLD + "Shop search: " + query;
+        Inventory inventory = Bukkit.createInventory(holder, SIZE, holder.title);
+        holder.inventory = inventory;
+        paintItems(holder);
+        player.openInventory(inventory);
+    }
+
+    /** Opens a listing focused on one item id (with sell price in the lore). */
+    public void openItem(Player player, String itemId) {
+        List<ShopCatalog.Entry> entries = new ArrayList<>();
+        for (ShopCatalog.Entry entry : loaded.catalog().all()) {
+            if (entry.itemId().equals(itemId)) {
+                entries.add(entry);
+            }
+        }
+        if (entries.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "That item is not in the shop catalog.");
+            return;
+        }
+        ItemsHolder holder = new ItemsHolder(player.getUniqueId(), ItemCategory.MISC, 0);
+        holder.customEntries = entries;
+        holder.title = ChatColor.GOLD + "Shop item: " + itemId;
+        Inventory inventory = Bukkit.createInventory(holder, SIZE, holder.title);
+        holder.inventory = inventory;
+        paintItems(holder);
         player.openInventory(inventory);
     }
 
@@ -154,11 +192,11 @@ public final class ShopMenu implements Listener {
         if (!holder.owner.equals(player.getUniqueId())) {
             return;
         }
-        ShopCatalog.Page page = loaded.catalog().page(holder.category, holder.pageIndex);
+        ShopCatalog.Page page = pageFor(holder);
         if (slot == PREV_SLOT && page.hasPrevious()) {
-            openCategory(player, holder.category, holder.pageIndex - 1);
+            openPage(player, holder, holder.pageIndex - 1);
         } else if (slot == NEXT_SLOT && page.hasNext()) {
-            openCategory(player, holder.category, holder.pageIndex + 1);
+            openPage(player, holder, holder.pageIndex + 1);
         } else if (slot == BACK_SLOT) {
             openCategories(player);
         } else if (slot < PAGE_SIZE && slot < page.entries().size()) {
@@ -169,6 +207,28 @@ public final class ShopMenu implements Listener {
                 player.sendMessage(ChatColor.RED + "That item is not for sale.");
             }
         }
+    }
+
+    private ShopCatalog.Page pageFor(ItemsHolder holder) {
+        if (holder.customEntries != null) {
+            return loaded.catalog().page(holder.customEntries, holder.pageIndex);
+        }
+        return loaded.catalog().page(holder.category, holder.pageIndex);
+    }
+
+    /** Re-renders the same holder type (category listing or custom listing) at a new page. */
+    private void openPage(Player player, ItemsHolder holder, int pageIndex) {
+        if (holder.customEntries == null) {
+            openCategory(player, holder.category, pageIndex);
+            return;
+        }
+        ItemsHolder next = new ItemsHolder(player.getUniqueId(), holder.category, pageIndex);
+        next.customEntries = holder.customEntries;
+        next.title = holder.title;
+        Inventory inventory = Bukkit.createInventory(next, SIZE, next.title);
+        next.inventory = inventory;
+        paintItems(next);
+        player.openInventory(inventory);
     }
 
     private void handleQuantityClick(Player player, QuantityHolder holder, int slot) {
@@ -192,10 +252,10 @@ public final class ShopMenu implements Listener {
         paintQuantity(holder);
     }
 
-    private void openCategory(Player player, ItemCategory category, int pageIndex) {
+    /** Opens one catalog category at the given page; used by the GUI and by /shop browse. */
+    public void openCategory(Player player, ItemCategory category, int pageIndex) {
         ItemsHolder holder = new ItemsHolder(player.getUniqueId(), category, pageIndex);
-        Inventory inventory = Bukkit.createInventory(holder, SIZE,
-                ChatColor.GOLD + "Shop / " + category.displayName());
+        Inventory inventory = Bukkit.createInventory(holder, SIZE, holder.title);
         holder.inventory = inventory;
         paintItems(holder);
         player.openInventory(inventory);
@@ -233,7 +293,7 @@ public final class ShopMenu implements Listener {
     private void paintItems(ItemsHolder holder) {
         Inventory inventory = holder.inventory;
         inventory.clear();
-        ShopCatalog.Page page = loaded.catalog().page(holder.category, holder.pageIndex);
+        ShopCatalog.Page page = pageFor(holder);
         List<ShopCatalog.Entry> entries = page.entries();
         for (int i = 0; i < entries.size() && i < PAGE_SIZE; i++) {
             ShopCatalog.Entry entry = entries.get(i);
@@ -248,6 +308,9 @@ public final class ShopMenu implements Listener {
             } else {
                 lore.add("Not currently for sale.");
             }
+            if (entry.sellable()) {
+                lore.add("Sells for " + Money.format(entry.sellMinor()) + " each");
+            }
             inventory.setItem(i, button(material, ChatColor.WHITE + displayName(entry.itemId()), lore));
         }
         if (entries.isEmpty()) {
@@ -261,7 +324,8 @@ public final class ShopMenu implements Listener {
             inventory.setItem(NEXT_SLOT, button(Material.ARROW, ChatColor.YELLOW + "Next page"));
         }
         inventory.setItem(BACK_SLOT, button(Material.BARRIER, ChatColor.YELLOW + "Back to categories"));
-        inventory.setItem(4, button(Material.PAPER, ChatColor.GOLD + holder.category.displayName(),
+        String header = holder.customEntries != null ? "Results" : holder.category.displayName();
+        inventory.setItem(4, button(Material.PAPER, ChatColor.GOLD + header,
                 "Page " + (page.pageIndex() + 1) + " of " + page.pageCount()));
     }
 
@@ -417,11 +481,16 @@ public final class ShopMenu implements Listener {
     private static final class ItemsHolder extends MenuHolder {
         final ItemCategory category;
         final int pageIndex;
+        /** When non-null, replaces the category listing (search results / single item). */
+        List<ShopCatalog.Entry> customEntries;
+        /** Window title, preserved across custom-listing page turns. */
+        String title;
 
         ItemsHolder(UUID owner, ItemCategory category, int pageIndex) {
             super(owner);
             this.category = category;
             this.pageIndex = pageIndex;
+            this.title = ChatColor.GOLD + "Shop / " + category.displayName();
         }
     }
 

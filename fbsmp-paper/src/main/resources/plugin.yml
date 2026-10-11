@@ -57,9 +57,11 @@ commands:
   afk:
     description: Mark yourself as away.
   sell:
-    description: Open the sell inventory.
+    description: Open the sell inventory, or sell every sellable stack.
+    usage: /sell [all]
   shop:
-    description: Open the server shop.
+    description: Open the server shop, or buy, sell, price or search items.
+    usage: /shop [buy <item> [qty]|sell <item> <qty>|price <item>|search <text>|browse <category>]
   ah:
     aliases: [aushop]
     description: Open the auction house.
@@ -68,7 +70,7 @@ commands:
     usage: /ausell <price>
   loan:
     description: View loan options or your account.
-    usage: /loan [amount|vu]
+    usage: /loan [take <amount>|repay [amount]|payoff|terms [amount]|info]
   mort:
     description: View mortgage options.
   mortvu:

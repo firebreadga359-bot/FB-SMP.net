@@ -59,4 +59,35 @@ class ShopCatalogTest {
             assertEquals(1, matches, entry.itemId());
         }
     }
+
+    @Test
+    void findReturnsTheEntryOrNull() {
+        ShopCatalog catalog = catalogWith(2);
+        ShopCatalog.Entry found = catalog.find("iron_ingot");
+        assertNotNull(found);
+        assertEquals("iron_ingot", found.itemId());
+        assertNull(catalog.find("definitely_not_an_item"));
+        assertNull(catalog.find(null));
+    }
+
+    @Test
+    void searchMatchesSubstringsCaseInsensitivelyAndCaps() {
+        ShopCatalog catalog = catalogWith(10);
+        var hits = catalog.search("STONE", 500);
+        assertFalse(hits.isEmpty());
+        assertTrue(hits.stream().allMatch(entry -> entry.itemId().contains("stone")));
+        assertEquals(3, catalog.search("stone", 3).size());
+        assertTrue(catalog.search("", 10).isEmpty());
+        assertTrue(catalog.search(null, 10).isEmpty());
+    }
+
+    @Test
+    void buyableAndSellableExcludeRestrictedEntries() {
+        ShopCatalog catalog = catalogWith(3);
+        assertTrue(catalog.buyable().stream().allMatch(ShopCatalog.Entry::buyable));
+        assertTrue(catalog.sellable().stream().allMatch(ShopCatalog.Entry::sellable));
+        // bedrock lands in the restricted category and must not be buyable or sellable.
+        assertTrue(catalog.find("bedrock") == null || !catalog.find("bedrock").buyable());
+        assertTrue(catalog.buyable().stream().noneMatch(entry -> entry.category() == ItemCategory.RESTRICTED));
+    }
 }

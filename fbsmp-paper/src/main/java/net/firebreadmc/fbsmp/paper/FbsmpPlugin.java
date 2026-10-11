@@ -77,7 +77,7 @@ public final class FbsmpPlugin extends JavaPlugin {
         }
         messages = new Messages(this);
         CommandRouter router = new CommandRouter(this, database, playerListener, sellMenu, shopMenu,
-                mortgageMenu, warpMenu, settingsMenu, auctionMenu, loanService, messages);
+                mortgageMenu, warpMenu, settingsMenu, auctionMenu, loanService, messages, sellService);
         for (String commandName : new String[]{
                 "bal", "baltop", "pay", "sethome", "home", "homes", "delhome", "warp", "rtpq",
                 "tpa", "tpahere", "tpaccept", "tpdeny", "msg", "reply", "ignore", "stats", "settings",

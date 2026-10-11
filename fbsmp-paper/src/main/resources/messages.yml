@@ -2,26 +2,48 @@ prefix: "&8[&6FB-SMP&8] &r"
 no-permission: "&cYou do not have permission to do that."
 player-only: "&cThat command can only be used in-game."
 shop:
-  usage: "&cUsage: /shop buy <item> [quantity]"
+  player-only: "&cThat command can only be used in-game."
+  help: "&6Shop &7| &f/shop &7open  &f/shop buy <item> [qty]  &f/shop sell <item> <qty>  &f/shop price <item>  &f/shop search <text>  &f/shop browse <category>"
+  usage: "&cUsage: /shop [buy <item> [qty]|sell <item> <qty>|price <item>|search <text>|browse <category>]"
   not-sold: "&cThat item is not currently sold by the shop."
   quantity-invalid: "&cQuantity must be a whole number."
   quantity-range: "&cQuantity must be between 1 and 64."
   amount-range: "&cThat purchase amount is outside the supported range."
   insufficient-funds: "&cYou do not have enough funds for {amount}."
   purchased: "&aPurchased {count}x {item} for &6{amount}&a."
+  sold: "&aSold {count}x {item} for &6{amount}&a."
+  buy:
+    usage: "&cUsage: /shop buy <item> [quantity]"
+  sell:
+    unavailable: "&cSelling is not available right now."
+    usage: "&cUsage: /shop sell <item> <quantity>"
+    not-sellable: "&cThat item cannot be sold to the shop."
+    not-held: "&cYou only have &f{held}&c of &f{item}&c to sell."
+    failed: "&cThe sale could not be completed; your items were returned."
+  price:
+    usage: "&cUsage: /shop price <item>"
+    line: "&6{item} &8| &7buy &f{buy} &7sell &f{sell}"
+  search:
+    usage: "&cUsage: /shop search <text>"
+  browse:
+    unknown: "&cUnknown category. Try /shop to list them."
 loan:
   unavailable: "&cThe loan system is not available right now."
-  usage: "&cUsage: /loan <take|repay|info> [amount]"
+  help: "&6Loans &7| &f/loan info  &f/loan take <amount>  &f/loan repay [amount]  &f/loan payoff  &f/loan terms [amount]"
+  usage: "&cUsage: /loan <take <amount>|repay [amount]|payoff|terms [amount]|info>"
   take:
     usage: "&cUsage: /loan take <amount>"
   limit-exceeded: "&cThat request exceeds the configured loan limit of &6{limit}&c."
   timed-out: "&cYou are currently timed out. Clear your overdue loan first."
   issue-failed: "&cLoan limit reached or the loan could not be issued."
   issued: "&aLoan #{id} issued: &6{amount} &7principal, &f{interest} &7interest, due &f{due}&a."
+  terms:
+    line: "&6Loan quote &8| &7principal &f{principal} &8| &7interest &f{interest} &8| &7total due &f{total} &8| &7term &f{term}d &8| &7due &f{due}"
   repay:
     insufficient: "&cInsufficient funds."
     none: "&cNo active loan balance was found."
     posted: "&aLoan repayment posted: &6{amount}&a. Remaining: &6{remaining}"
+    cleared: "&aThat was your final payment — the loan is cleared."
   info:
     none: "&6Loans: &fno active loans."
     header: "&6Active loans:"
