@@ -98,6 +98,11 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   post de-duplicated down/up alerts to a webhook via `FBSMP_ALERT_WEBHOOK` or
   a `.fbsmp-alert-webhook` file. `api.mcstatus.io` rejects the default Python
   user-agent with 403 — always send a `User-Agent` header.
+- Discord webhook alerts: the URL lives only in `.fbsmp-alert-webhook` (gitignored)
+  and the `DISCORD_WEBHOOK_URL` agent-server secret — never in the repo. Payloads
+  include `allowed_mentions: {"parse": []}`. Discord's edge (Cloudflare) returns
+  **403 code 1010** for POSTs with no `User-Agent`; curl passes by default but
+  Python `urllib` must send one.
 
 ## Shop and sell
 
