@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FB-SMP — a survival multiplayer world, Java &amp; Bedrock</title>
+<meta name="description" content="FB-SMP is a survival multiplayer Minecraft world open to Java and Bedrock players. Join the community, trade in the player economy, build something that lasts.">
+<style>
+  :root{
+    --bg:#0b0f0c;
+    --bg-2:#10160f;
+    --panel:#141b15;
+    --line:#22301f;
+    --ink:#eef3ea;
+    --muted:#9db08f;
+    --accent:#7bd44a;
+    --accent-2:#3fa34d;
+    --gold:#e6c34a;
+    --radius:16px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;font-family:var(--sans);color:var(--ink);background:var(--bg);
+    line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(123,212,74,.16), transparent 60%),
+      radial-gradient(700px 420px at 95% 0%, rgba(63,163,77,.12), transparent 55%),
+      linear-gradient(180deg,#0b0f0c, #0b0f0c);
+  }
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 22px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  header.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
+    background:rgba(11,15,12,.72);border-bottom:1px solid var(--line)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;
+    max-width:1080px;margin:0 auto;padding:12px 22px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
+  .brand .cube{width:22px;height:22px;border-radius:5px;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    box-shadow:0 0 0 1px rgba(255,255,255,.08) inset}
+  .nav-links{display:flex;gap:20px;font-size:.95rem}
+  .nav-links a{color:var(--muted)}
+  .nav-links a:hover{color:var(--ink)}
+
+  .hero{padding:78px 0 46px}
+  .tag{display:inline-block;font-family:var(--mono);font-size:.78rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--accent);border:1px solid var(--line);
+    background:rgba(123,212,74,.06);padding:6px 12px;border-radius:999px;margin-bottom:22px}
+  h1{font-size:clamp(2.5rem,6vw,4.3rem);line-height:1.02;margin:0 0 18px;
+    letter-spacing:-.02em;font-weight:900}
+  h1 .grad{background:linear-gradient(120deg,var(--accent),var(--gold));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{font-size:clamp(1.05rem,2.2vw,1.3rem);color:var(--muted);max-width:60ch;margin:0 0 30px}
+  .cta{display:flex;flex-wrap:wrap;gap:14px}
+  .btn{display:inline-flex;align-items:center;gap:9px;font-weight:700;font-size:1rem;
+    padding:13px 22px;border-radius:12px;border:1px solid transparent;cursor:pointer}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#08130a}
+  .btn.primary:hover{filter:brightness(1.06);text-decoration:none}
+  .btn.ghost{border-color:var(--line);color:var(--ink);background:rgba(255,255,255,.02)}
+  .btn.ghost:hover{border-color:var(--accent);text-decoration:none}
+
+  section{padding:46px 0;border-top:1px solid var(--line)}
+  h2{font-size:clamp(1.5rem,3.4vw,2.1rem);margin:0 0 8px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0 0 28px;max-width:62ch}
+
+  .grid{display:grid;gap:18px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg-2));
+    border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+  .card h3{margin:0 0 6px;font-size:1.08rem}
+  .card p{margin:0;color:var(--muted);font-size:.95rem}
+  .card .ico{font-size:1.4rem;margin-bottom:10px;display:block}
+
+  .join-grid{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .addr{display:flex;align-items:center;gap:10px;margin-top:14px;
+    background:#0a0d0a;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .addr code{font-family:var(--mono);font-size:.95rem;color:var(--gold);
+    overflow:auto;white-space:nowrap;flex:1}
+  .copy{border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--ink);
+    border-radius:9px;padding:7px 11px;font-size:.82rem;cursor:pointer;font-weight:600}
+  .copy:hover{border-color:var(--accent);color:var(--accent)}
+  .pill{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;
+    color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+
+  .form-card{background:linear-gradient(180deg,var(--panel),var(--bg-2));
+    border:1px solid var(--line);border-radius:var(--radius);padding:26px;max-width:640px}
+  .field{margin-bottom:16px}
+  label{display:block;font-size:.9rem;font-weight:600;margin-bottom:6px}
+  input,select,textarea{width:100%;font:inherit;color:var(--ink);background:#0a0d0a;
+    border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  textarea{min-height:96px;resize:vertical}
+  .check{display:flex;gap:10px;align-items:flex-start}
+  .check input{width:auto;margin-top:5px}
+  .check label{font-weight:500;color:var(--muted);font-size:.92rem;margin:0}
+  .note{font-size:.85rem;color:var(--muted)}
+  .status{margin-top:14px;font-size:.95rem;display:none;padding:12px 14px;border-radius:11px}
+  .status.ok{display:block;color:#0a130a;background:var(--accent);font-weight:700}
+  .status.err{display:block;color:#ffd9d9;background:#3a1414;border:1px solid #7a2b2b}
+
+  footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--muted);font-size:.9rem}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <div class="brand"><span class="cube"></span> FB-SMP</div>
+    <nav class="nav-links">
+      <a href="#join">How to join</a>
+      <a href="#features">The world</a>
+      <a href="#signup">Sign up</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero" style="border-top:none">
+    <span class="tag">Survival multiplayer · Java &amp; Bedrock</span>
+    <h1>One world.<br><span class="grad">Everyone welcome.</span></h1>
+    <p class="lede">FB-SMP is a long-running survival world where Java and Bedrock players
+      build side by side. A player-run economy, protected builds, and a community that
+      actually sticks around.</p>
+    <div class="cta">
+      <a class="btn primary" href="#join">Join the server</a>
+      <a class="btn ghost" href="#signup">Sign up for an invite</a>
+    </div>
+  </section>
+
+  <section id="join">
+    <h2>How to join</h2>
+    <p class="sub">Bedrock players connect through Geyser, so both editions share the same
+      world. Pick your edition, copy the address, and you are in.</p>
+    <div class="grid join-grid">
+      <div class="card">
+        <span class="pill">Java Edition</span>
+        <h3 style="margin-top:12px">Java players</h3>
+        <p>Add the server in Minecraft, paste the address, and join.</p>
+        <div class="addr">
+          <code id="java-addr">cairo-paste.tun.ply.gg:25565</code>
+          <button class="copy" data-copy="java-addr">Copy</button>
+        </div>
+      </div>
+      <div class="card">
+        <span class="pill">Bedrock · Geyser</span>
+        <h3 style="margin-top:12px">Bedrock players</h3>
+        <p>Phone, console, or Windows. Add a server and use this address and port.</p>
+        <div class="addr">
+          <code id="bedrock-addr">fried-toilette.tun.ply.gg:37298</code>
+          <button class="copy" data-copy="bedrock-addr">Copy</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <h2>What is waiting for you</h2>
+    <p class="sub">Everything that makes a survival world worth logging into again.</p>
+    <div class="grid cards">
+      <div class="card"><span class="ico">🧱</span><h3>Survival, not chaos</h3>
+        <p>Land claims and rollback keep griefers out. Build knowing it stays.</p></div>
+      <div class="card"><span class="ico">🛒</span><h3>A real economy</h3>
+        <p>Player shops, a marketplace and loans. Trade, specialize, get rich.</p></div>
+      <div class="card"><span class="ico">📱</span><h3>Crossplay</h3>
+        <p>Java and Bedrock in one world through Geyser and Floodgate.</p></div>
+      <div class="card"><span class="ico">⏱️</span><h3>Always on</h3>
+        <p>Automatic restarts and monitoring keep the world online around the clock.</p></div>
+      <div class="card"><span class="ico">🏘️</span><h3>Community first</h3>
+        <p>Shared towns, group projects and events — not a solo grind.</p></div>
+      <div class="card"><span class="ico">🛡️</span><h3>Fair play</h3>
+        <p>Active moderation and clear rules, so everyone gets a fair start.</p></div>
+    </div>
+  </section>
+
+  <section id="signup">
+    <h2>Sign up for an invite</h2>
+    <p class="sub">Leave your details and we will send you the join info and whitelist you.
+      We only use this to reach you about the server.</p>
+
+    <div class="form-card">
+      <form id="join-form" novalidate>
+        <div class="field">
+          <label for="f-name">Name or gamertag</label>
+          <input id="f-name" name="name" type="text" maxlength="500" required autocomplete="nickname">
+        </div>
+        <div class="field">
+          <label for="f-email">Email</label>
+          <input id="f-email" name="email" type="email" maxlength="254" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="f-platform">Platform</label>
+          <select id="f-platform" name="platform" required>
+            <option value="">Choose one…</option>
+            <option value="java">Java</option>
+            <option value="bedrock">Bedrock</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-message">Tell us about yourself <span class="note">(optional)</span></label>
+          <textarea id="f-message" name="message" maxlength="5000"></textarea>
+        </div>
+        <div class="field check">
+          <input id="f-consent" name="consent" type="checkbox" required>
+          <label for="f-consent">Yes, you may reply to me about joining FB-SMP.</label>
+        </div>
+        <button class="btn primary" type="submit" id="submit-btn">Send my request</button>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+        <p class="note" style="margin-top:12px">Submissions are public intake for this site
+          and are read by the server owners. Please do not include sensitive information.</p>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>FB-SMP — a community survival world.</span>
+    <span>Java &amp; Bedrock · Geyser · 24/7</span>
+  </div>
+</footer>
+
+<script>
+  // Copy-to-clipboard for the join addresses.
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var el = document.getElementById(btn.dataset.copy);
+      var text = el.textContent.trim();
+      navigator.clipboard.writeText(text).then(function () {
+        var old = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = old; }, 1400);
+      });
+    });
+  });
+
+  // Lead form: send JSON to the site's own host (relative URL), branch on "code".
+  var ERROR_TEXT = {
+    missing_field: 'Please fill in every required field.',
+    invalid_value: 'One of the values was not valid. Please check and try again.',
+    not_an_option: 'Please choose one of the offered platforms.',
+    value_too_long: 'One of your answers is too long.',
+    consent_not_given: 'Please tick the consent box so we may reply.',
+    unknown_field: 'Something went wrong with the form. Please refresh and retry.',
+    invalid_body: 'Something went wrong with the form. Please refresh and retry.',
+    too_many_submissions: 'Too many attempts. Please wait a few minutes and try again.',
+    project_busy: 'The server is busy right now. Please try again a little later.',
+    preview_not_accepted: 'This preview cannot take submissions — use the live site.',
+    no_such_form: 'The form is not available right now. Please try again later.'
+  };
+
+  var form = document.getElementById('join-form');
+  var status = document.getElementById('status');
+  var submitBtn = document.getElementById('submit-btn');
+
+  function show(cls, msg) {
+    status.className = 'status ' + cls;
+    status.textContent = msg;
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = document.getElementById('f-name').value.trim();
+    var email = document.getElementById('f-email').value.trim();
+    var platform = document.getElementById('f-platform').value;
+    var message = document.getElementById('f-message').value.trim();
+    var consent = document.getElementById('f-consent').checked;
+
+    if (!name || !email || !platform || !consent) {
+      show('err', ERROR_TEXT.missing_field);
+      return;
+    }
+
+    var payload = { name: name, email: email, platform: platform, consent: consent };
+    if (message) payload.message = message;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+    status.className = 'status';
+
+    fetch('/_forms/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          return { ok: res.ok, status: res.status, data: data };
+        });
+      })
+      .then(function (r) {
+        if (r.ok && (r.status === 201 || r.data.status === 'accepted')) {
+          form.reset();
+          show('ok', 'Thanks — your request is in. We will be in touch about joining.');
+        } else {
+          var code = r.data && r.data.code;
+          show('err', ERROR_TEXT[code] || 'We could not send that. Please try again in a moment.');
+        }
+      })
+      .catch(function () {
+        show('err', 'Network problem — please check your connection and try again.');
+      })
+      .then(function () {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send my request';
+      });
+  });
+</script>
+</body>
+</html>
