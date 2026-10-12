@@ -2,3 +2,32 @@ maximum-principal: 1000000.00
 interest-rate-percent: 8.00
 repayment-days: 30
 overdue-fee-percent: 2.00
+
+# Days before the due date to warn the borrower (calendar days).
+warning-lead-days: 3
+# Block new borrowing while an overdue timeout is active.
+require-clear-timeout-to-borrow: true
+
+interest:
+  # LINEAR uses interest-rate-percent for the whole term. TIERED uses the
+  # tiers below keyed by maximum term length in days.
+  model: LINEAR
+  tiers: {}
+
+timeout:
+  # Hard cap on any single timeout duration, in seconds (default 7 days).
+  max-duration-seconds: 604800
+  # Debt tiers are evaluated against the remaining balance at the moment the
+  # loan becomes overdue. The final tier must be open-ended (no max-debt).
+  tiers:
+    - min-debt: 0.01
+      max-debt: 5000.00
+      duration-seconds: 3600
+      reason: Small overdue balance
+    - min-debt: 5000.01
+      max-debt: 25000.00
+      duration-seconds: 86400
+      reason: Medium overdue balance
+    - min-debt: 25000.01
+      duration-seconds: 604800
+      reason: Large overdue balance

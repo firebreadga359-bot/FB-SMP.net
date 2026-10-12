@@ -1,14 +1,16 @@
 package net.firebreadmc.fbsmp.paper.menus;
 
 import net.firebreadmc.fbsmp.common.Money;
+import net.firebreadmc.fbsmp.common.sell.SellEligibilityPolicy;
+import net.firebreadmc.fbsmp.common.sell.SellPreview;
 import net.firebreadmc.fbsmp.paper.FbsmpPlugin;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
+import net.firebreadmc.fbsmp.paper.sell.SellService;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -22,15 +24,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Locale;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,18 +34,22 @@ import java.util.Map;
 public final class SellMenu implements Listener {
     private static final int MENU_SIZE = 54;
     private static final int CANCEL_SLOT = 45;
+    private static final int SELL_ALL_SLOT = 48;
     private static final int CONFIRM_SLOT = 49;
     private static final int TOTAL_SLOT = 53;
     private final FbsmpPlugin plugin;
     private final FbsmpDatabase database;
     private final PlayerListener playerListener;
+    private final SellService sellService;
     private final NamespacedKey sellItemKey;
     private final Map<UUID, SellSession> active = new ConcurrentHashMap<>();
 
-    public SellMenu(FbsmpPlugin plugin, FbsmpDatabase database, PlayerListener playerListener) {
+    public SellMenu(FbsmpPlugin plugin, FbsmpDatabase database, PlayerListener playerListener,
+                    SellService sellService) {
         this.plugin = plugin;
         this.database = database;
         this.playerListener = playerListener;
+        this.sellService = sellService;
         this.sellItemKey = new NamespacedKey(plugin, "sell_line_id");
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
@@ -74,6 +73,21 @@ public final class SellMenu implements Listener {
             plugin.getLogger().warning("Could not open sell inventory for " + player.getUniqueId() + ": "
                     + exception.getMessage());
             player.sendMessage(ChatColor.RED + "Sell inventory could not be opened. Try again.");
+        }
+    }
+
+    /** Opens the sell menu and, when requested, stages every sellable stack. */
+    public void openFor(Player player, boolean sellAll) {
+        open(player);
+        if (sellAll) {
+            SellSession session = active.get(player.getUniqueId());
+            if (session != null) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (player.isOnline() && active.get(player.getUniqueId()) == session) {
+                        stageSellAll(player, session);
+                    }
+                });
+            }
         }
     }
 
@@ -106,6 +120,8 @@ public final class SellMenu implements Listener {
         if (rawSlot < MENU_SIZE) {
             if (rawSlot == CANCEL_SLOT) {
                 cancel(player, session, true);
+            } else if (rawSlot == SELL_ALL_SLOT) {
+                stageSellAll(player, session);
             } else if (rawSlot == CONFIRM_SLOT) {
                 confirm(player, session);
             }
@@ -156,22 +172,21 @@ public final class SellMenu implements Listener {
             player.sendMessage(ChatColor.RED + "Could not verify sell inventory capacity.");
             return;
         }
-        long unitPrice;
+        SellService.Offer offer;
         try {
-            unitPrice = priceFor(original.getType());
-        } catch (IllegalArgumentException exception) {
-            player.sendMessage(ChatColor.RED + exception.getMessage());
+            offer = sellService.offer(slot, original);
+        } catch (RuntimeException exception) {
+            player.sendMessage(ChatColor.RED + "That item could not be priced for sale.");
             return;
         }
+        if (offer == null) {
+            SellEligibilityPolicy.Decision decision = sellService.evaluate(original);
+            player.sendMessage(ChatColor.RED + (decision.message().isBlank()
+                    ? "That item cannot be sold." : decision.message()));
+            return;
+        }
+        long total = offer.totalValueMinor();
         ItemStack stored = original.clone();
-        int quantity = stored.getAmount();
-        long total;
-        try {
-            total = Math.multiplyExact(unitPrice, quantity);
-        } catch (ArithmeticException exception) {
-            player.sendMessage(ChatColor.RED + "That sell total is outside the supported range.");
-            return;
-        }
         String lineId = UUID.randomUUID().toString();
         ItemStack tagged = original.clone();
         ItemMeta taggedMeta = tagged.getItemMeta();
@@ -234,10 +249,12 @@ public final class SellMenu implements Listener {
             }
             inventory.setItem(CANCEL_SLOT, button(Material.RED_STAINED_GLASS_PANE, ChatColor.RED + "Cancel sale",
                     "Return staged items to your mailbox."));
+            inventory.setItem(SELL_ALL_SLOT, button(Material.HOPPER, ChatColor.AQUA + "Sell all sellables",
+                    "Stage every sellable stack from your inventory."));
             inventory.setItem(CONFIRM_SLOT, button(Material.EMERALD, ChatColor.GREEN + "Confirm sale",
                     "Complete the sale and receive " + Money.format(total) + "."));
             inventory.setItem(TOTAL_SLOT, button(Material.PAPER, ChatColor.GOLD + "Sale total: " + Money.format(total),
-                    "Place sellable items from your inventory above."));
+                    "Left-click inventory items, or use Sell all."));
         } catch (SQLException | IllegalArgumentException | ArithmeticException exception) {
             plugin.getLogger().warning("Could not refresh sell inventory: " + exception.getMessage());
             player.sendMessage(ChatColor.RED + "Sell inventory could not be refreshed.");
@@ -288,21 +305,100 @@ public final class SellMenu implements Listener {
         }
     }
 
-    private long priceFor(Material material) {
-        var file = plugin.getDataFolder().toPath().resolve("sell_prices.yml").toFile();
-        if (!file.isFile()) {
-            throw new IllegalArgumentException("Sell prices are not configured.");
-        }
-        YamlConfiguration prices = YamlConfiguration.loadConfiguration(file);
-        String raw = prices.getString("prices." + material.name());
-        if (raw == null) {
-            throw new IllegalArgumentException(material.name() + " is not accepted by the sell inventory.");
-        }
+    private void stageSellAll(Player player, SellSession session) {
+        int capacity;
         try {
-            return new BigDecimal(raw).setScale(2, RoundingMode.UNNECESSARY)
-                    .movePointRight(2).longValueExact();
-        } catch (ArithmeticException | NumberFormatException exception) {
-            throw new IllegalArgumentException("The configured price for " + material.name() + " is invalid.");
+            capacity = 45 - database.sellLines(session.id, player.getUniqueId()).size();
+        } catch (SQLException exception) {
+            player.sendMessage(ChatColor.RED + "Could not verify sell inventory capacity.");
+            return;
+        }
+        if (capacity <= 0) {
+            player.sendMessage(ChatColor.RED + "The sell inventory is full.");
+            return;
+        }
+        List<SellService.Offer> offers = sellService.offers(player);
+        int staged = 0;
+        long stagedValue = 0;
+        for (SellService.Offer offer : offers) {
+            if (staged >= capacity) {
+                break;
+            }
+            if (stage(player, session, offer)) {
+                staged++;
+                stagedValue += offer.totalValueMinor();
+            }
+        }
+        playerListener.markActive(player);
+        refresh(player, session);
+        if (staged == 0) {
+            player.sendMessage(ChatColor.YELLOW + "Nothing in your inventory can be sold right now.");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Staged " + staged + " stack(s) worth "
+                    + ChatColor.GOLD + Money.format(stagedValue) + ChatColor.GREEN + ".");
+        }
+        showSellPreview(player);
+    }
+
+    private void showSellPreview(Player player) {
+        SellPreview preview = sellService.previewInventory(player);
+        if (preview.empty()) {
+            player.sendMessage(ChatColor.YELLOW + "No sellable items were found in your inventory.");
+        } else {
+            player.sendMessage(ChatColor.GOLD + "Sellable now: " + ChatColor.WHITE + preview.soldItems()
+                    + " item(s) in " + preview.soldTypes() + " type(s) for " + ChatColor.GOLD
+                    + Money.format(preview.totalMinor()) + ChatColor.WHITE + ".");
+        }
+        int shown = 0;
+        for (SellPreview.Kept kept : preview.kept()) {
+            if (shown++ >= 5) {
+                player.sendMessage(ChatColor.GRAY + "  ...and " + (preview.kept().size() - 5)
+                        + " more item type(s) kept.");
+                break;
+            }
+            player.sendMessage(ChatColor.GRAY + "  Kept " + kept.itemId() + " x" + kept.quantity()
+                    + ": " + kept.message());
+        }
+    }
+
+    /**
+     * Stages one eligible offer into the escrow and clears the source slot. Returns
+     * true only when the item was stored. On failure the slot is left untouched.
+     */
+    private boolean stage(Player player, SellSession session, SellService.Offer offer) {
+        int slot = offer.slot();
+        ItemStack current = player.getInventory().getItem(slot);
+        if (current == null || !current.isSimilar(offer.stack())) {
+            return false;
+        }
+        String lineId = UUID.randomUUID().toString();
+        ItemStack tagged = current.clone();
+        ItemMeta taggedMeta = tagged.getItemMeta();
+        if (taggedMeta == null) {
+            return false;
+        }
+        taggedMeta.getPersistentDataContainer().set(sellItemKey, PersistentDataType.STRING, lineId);
+        tagged.setItemMeta(taggedMeta);
+        player.getInventory().setItem(slot, tagged);
+        player.saveData();
+
+        ItemStack stored = offer.stack().clone();
+        ItemMeta storedMeta = stored.getItemMeta();
+        if (storedMeta != null) {
+            storedMeta.getPersistentDataContainer().remove(sellItemKey);
+            stored.setItemMeta(storedMeta);
+        }
+        String itemData = Base64.getEncoder().encodeToString(stored.serializeAsBytes());
+        try {
+            database.addSellItem(session.id, player.getUniqueId(), lineId, itemData,
+                    offer.totalValueMinor(), System.currentTimeMillis());
+            player.getInventory().setItem(slot, null);
+            player.saveData();
+            return true;
+        } catch (SQLException exception) {
+            plugin.getLogger().warning("Could not stage a sell-all item for " + player.getUniqueId() + ": "
+                    + exception.getMessage());
+            return false;
         }
     }
 

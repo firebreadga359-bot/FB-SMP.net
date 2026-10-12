@@ -16,6 +16,11 @@ admin-panel:
   enabled: true
   bind-address: 127.0.0.1
   port: 8765
+  # Only enable external binds when a reverse proxy in front enforces TLS and
+  # rewrites the Host header to a loopback value. Loopback is strongly preferred.
+  allow-external-bind: false
+  trust-proxy: false
+  trusted-proxies: []
 afk:
   inactivity-seconds: 300
 backups:

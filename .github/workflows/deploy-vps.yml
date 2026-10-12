@@ -1,0 +1,83 @@
+name: Deploy to VPS
+
+# Runs the installer on the VPS after changes land on main, so pushing to the
+# repository is all it takes to update the live server. The installer is
+# idempotent: the world and secrets on the VPS are never overwritten.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   VPS_HOST      hostname or IP of the VPS
+#   VPS_USER      SSH user with passwordless sudo (or root)
+#   VPS_SSH_KEY   private key whose public half is in that user's authorized_keys
+# Optional:
+#   VPS_PORT      SSH port (default 22)
+#   VPS_REPO_DIR  checkout path on the VPS (default /opt/fb-smp-repo)
+#
+# If the secrets are absent the job fails fast with a clear message; it never
+# touches a host it cannot authenticate to.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deployment secrets
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          missing=""
+          [ -z "$VPS_SSH_KEY" ] && missing="$missing VPS_SSH_KEY"
+          [ -z "$VPS_HOST" ] && missing="$missing VPS_HOST"
+          [ -z "$VPS_USER" ] && missing="$missing VPS_USER"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            echo "Add them under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_REPO_DIR: ${{ secrets.VPS_REPO_DIR }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          PORT="${VPS_PORT:-22}"
+          DIR="${VPS_REPO_DIR:-/opt/fb-smp-repo}"
+          ssh -i ~/.ssh/id_deploy -p "$PORT" \
+              -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 \
+              "$VPS_USER@$VPS_HOST" \
+              "FBSMP_REPO_DIR='$DIR' FBSMP_BRANCH='$BRANCH' FBSMP_REPO_URL='https://github.com/$REPO.git' bash -s" <<'REMOTE'
+          set -euo pipefail
+          command -v git >/dev/null 2>&1 || {
+            sudo apt-get update -y && sudo apt-get install -y git ca-certificates curl
+          }
+          if [ ! -d "$FBSMP_REPO_DIR/.git" ]; then
+            sudo mkdir -p "$(dirname "$FBSMP_REPO_DIR")"
+            sudo git clone "$FBSMP_REPO_URL" "$FBSMP_REPO_DIR"
+          fi
+          sudo FBSMP_REPO_DIR="$FBSMP_REPO_DIR" FBSMP_BRANCH="$FBSMP_BRANCH" \
+               FBSMP_REPO_URL="$FBSMP_REPO_URL" bash "$FBSMP_REPO_DIR/deploy/provision-vps.sh"
+          REMOTE

@@ -1,11 +1,12 @@
 # Values are in ₣฿; only materials listed here can be sold.
+# Explicit sell prices must stay strictly below the shop buy price in shop.yml.
 prices:
-  COBBLESTONE: 0.15
-  STONE: 0.25
+  COBBLESTONE: 0.07
+  STONE: 0.12
   OAK_LOG: 1.00
   WHEAT: 0.40
-  CARROT: 0.35
-  POTATO: 0.35
-  IRON_INGOT: 4.00
+  CARROT: 0.12
+  POTATO: 0.12
+  IRON_INGOT: 2.00
   GOLD_INGOT: 6.00
-  COAL: 1.25
+  COAL: 0.60

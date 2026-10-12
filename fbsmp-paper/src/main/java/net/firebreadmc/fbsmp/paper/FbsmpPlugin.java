@@ -1,9 +1,13 @@
 package net.firebreadmc.fbsmp.paper;
 
+import net.firebreadmc.fbsmp.common.sell.SellEligibilityPolicy;
 import net.firebreadmc.fbsmp.paper.admin.PrivateAdminPanel;
 import net.firebreadmc.fbsmp.paper.commands.CommandRouter;
 import net.firebreadmc.fbsmp.paper.data.FbsmpDatabase;
 import net.firebreadmc.fbsmp.paper.listeners.PlayerListener;
+import net.firebreadmc.fbsmp.paper.loan.LoanService;
+import net.firebreadmc.fbsmp.paper.messages.Messages;
+import net.firebreadmc.fbsmp.paper.sell.SellService;
 import net.firebreadmc.fbsmp.paper.listeners.ModerationListener;
 import net.firebreadmc.fbsmp.paper.menus.ShopMenu;
 import net.firebreadmc.fbsmp.paper.menus.SellMenu;
@@ -22,6 +26,8 @@ import java.util.Objects;
 public final class FbsmpPlugin extends JavaPlugin {
     private FbsmpDatabase database;
     private PrivateAdminPanel adminPanel;
+    private Messages messages;
+    private ShopMenu shopMenu;
     private long startedAtMillis;
 
     @Override
@@ -55,19 +61,30 @@ public final class FbsmpPlugin extends JavaPlugin {
 
         PlayerListener playerListener = new PlayerListener(this, database);
         new ModerationListener(this, database);
-        SellMenu sellMenu = new SellMenu(this, database, playerListener);
         ShopMenu shopMenu = new ShopMenu(this, database, playerListener);
+        this.shopMenu = shopMenu;
+        SellService sellService = new SellService(shopMenu, new SellEligibilityPolicy(
+                SellEligibilityPolicy.Config.defaults()));
+        SellMenu sellMenu = new SellMenu(this, database, playerListener, sellService);
         MortgageMenu mortgageMenu = new MortgageMenu(this, database);
         WarpMenu warpMenu = new WarpMenu(this, database);
         SettingsMenu settingsMenu = new SettingsMenu(this, database, playerListener);
         AuctionMenu auctionMenu = new AuctionMenu(this, database, playerListener);
+        LoanService loanService = null;
+        try {
+            long calendarStart = Long.parseLong(database.calendarStart());
+            loanService = new LoanService(this, database, calendarStart);
+        } catch (SQLException exception) {
+            getLogger().severe("Could not initialise the loan service: " + exception.getMessage());
+        }
+        messages = new Messages(this);
         CommandRouter router = new CommandRouter(this, database, playerListener, sellMenu, shopMenu,
-                mortgageMenu, warpMenu, settingsMenu, auctionMenu);
+                mortgageMenu, warpMenu, settingsMenu, auctionMenu, loanService, messages, sellService);
         for (String commandName : new String[]{
                 "bal", "baltop", "pay", "sethome", "home", "homes", "delhome", "warp", "rtpq",
                 "tpa", "tpahere", "tpaccept", "tpdeny", "msg", "reply", "ignore", "stats", "settings",
                 "afk", "sell", "shop", "ah", "ausell", "loan", "mort", "mortvu", "gift", "orders",
-                "ban", "kick", "timeout", "fbsmp"
+                "ban", "kick", "timeout", "fbsmp", "shopadmin", "loanadmin"
         }) {
             Objects.requireNonNull(getCommand(commandName), "Missing command declaration: " + commandName)
                     .setExecutor(router);
@@ -86,9 +103,20 @@ public final class FbsmpPlugin extends JavaPlugin {
                 getLogger().warning("Could not process expired listings: " + exception.getMessage());
             }
         }, 20L * 60, 20L * 60 * 5);
+        if (loanService != null) {
+            LoanService scheduled = loanService;
+            Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+                try {
+                    scheduled.tick();
+                } catch (SQLException exception) {
+                    getLogger().warning("Loan tick failed: " + exception.getMessage());
+                }
+            }, 20L * 60, 20L * 60);
+        }
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this, this::tickDashboard, 20L * 15, 20L * 15);
         if (getConfig().getBoolean("admin-panel.enabled", true)) {
             try {
-                adminPanel = new PrivateAdminPanel(this, database);
+                adminPanel = new PrivateAdminPanel(this, database, shopMenu);
                 adminPanel.start();
             } catch (IOException | IllegalArgumentException exception) {
                 getLogger().severe("The private admin panel could not start: " + exception.getMessage());
@@ -115,6 +143,10 @@ public final class FbsmpPlugin extends JavaPlugin {
         return database;
     }
 
+    public ShopMenu shopMenu() {
+        return shopMenu;
+    }
+
     public void backupDatabase() throws SQLException, IOException {
         Path backupDirectory = getDataFolder().toPath().resolve("backups");
         java.nio.file.Files.createDirectories(backupDirectory);
@@ -133,6 +165,36 @@ public final class FbsmpPlugin extends JavaPlugin {
 
     public long uptimeSeconds() {
         return Math.max(0L, (System.currentTimeMillis() - startedAtMillis) / 1000L);
+    }
+
+    /** Delivers queued announcements and runs due scheduled tasks (async tick). */
+    private void tickDashboard() {
+        if (database == null) {
+            return;
+        }
+        try {
+            for (var announcement : database.pendingAnnouncements()) {
+                final String message = announcement.message();
+                Bukkit.getScheduler().runTask(this, () -> Bukkit.broadcastMessage(
+                        org.bukkit.ChatColor.GOLD + "[FB-SMP] " + org.bukkit.ChatColor.WHITE + message));
+                database.markAnnouncementDelivered(announcement.id(), System.currentTimeMillis());
+            }
+            long now = System.currentTimeMillis();
+            for (var task : database.dueScheduledTasks(now)) {
+                final String payload = task.payload();
+                if (task.kind().equals("ANNOUNCE")) {
+                    Bukkit.getScheduler().runTask(this, () -> Bukkit.broadcastMessage(
+                            org.bukkit.ChatColor.GOLD + "[FB-SMP] " + org.bukkit.ChatColor.WHITE + payload));
+                } else {
+                    Bukkit.getScheduler().runTask(this, () ->
+                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), payload));
+                }
+                long interval = Math.max(1, task.intervalMinutes()) * 60_000L;
+                database.markScheduledTaskRun(task.id(), now + interval, now);
+            }
+        } catch (SQLException exception) {
+            getLogger().warning("Dashboard scheduler tick failed: " + exception.getMessage());
+        }
     }
 
     private void saveResourceIfMissing(String name) {
