@@ -97,8 +97,12 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   `/opt/fb-smp-repo`, then run `deploy/deploy.sh`. It is idempotent and preserves
   `/opt/fb-smp/server`. `.github/workflows/deploy-vps.yml` calls it over SSH on
   every push to `main` (needs `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY` repo secrets).
-- The workflow only runs from the default branch, so it activates once the
-  deploy work is on `main` (i.e. after this PR merges).
+- `deploy/make-migration-bundle.sh` snapshots a stopped server's world,
+  `plugins/FBSMP`, Floodgate `key.pem`, `forwarding.secret`, `server.properties`
+  and the playit secret (`/workspace/playit-agent/playit.toml`) into
+  `/workspace/fbsmp-migrate.tar.gz` for moving to a VPS. Unpack into
+  `/opt/fb-smp/server`; reuse the playit secret to keep the same public
+  addresses. It refuses to run while `paper.jar` is alive.
 - `fbsmp-health.sh` is portable: it reads all paths from `FBSMP_*` env vars
   (container defaults), checks Java/Bedrock through `api.mcstatus.io`, and can
   post de-duplicated down/up alerts to a webhook via `FBSMP_ALERT_WEBHOOK` or
