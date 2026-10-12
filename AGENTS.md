@@ -89,6 +89,15 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
 - `bash /workspace/make-deploy-bundle.sh` builds `/workspace/fbsmp-deploy.tar.gz`
   — a complete, portable deploy (jars, world, FBSMP data, panel bridge, scripts,
   systemd units) for a real always-on host.
+- `deploy/deploy.sh` (the VPS installer) also ships `fbsmp-health.sh` and
+  `tools/panel_bridge.py` and installs `fb-smp-panel-bridge` + `fb-smp-health`
+  systemd units. On a VPS set `FBSMP_MANAGE_PLAYIT=0` so the watchdog restarts
+  the playit *unit* instead of starting a duplicate agent.
+- `fbsmp-health.sh` is portable: it reads all paths from `FBSMP_*` env vars
+  (container defaults), checks Java/Bedrock through `api.mcstatus.io`, and can
+  post de-duplicated down/up alerts to a webhook via `FBSMP_ALERT_WEBHOOK` or
+  a `.fbsmp-alert-webhook` file. `api.mcstatus.io` rejects the default Python
+  user-agent with 403 — always send a `User-Agent` header.
 
 ## Shop and sell
 
