@@ -298,10 +298,10 @@ FBSMP_PLAYIT_DIR=$INSTALL_DIR/playit
 FBSMP_PLAYIT_BIN=./playit
 FBSMP_PLAYIT_SECRET=./playit.toml
 FBSMP_BRIDGE_DIR=$SERVER
-FBSMP_BRIDGE_CMD=python3 $SERVER/tools/panel_bridge.py
+FBSMP_BRIDGE_CMD="python3 $SERVER/tools/panel_bridge.py"
 FBSMP_PANEL_URL=http://127.0.0.1:12000/
 FBSMP_MANAGE_PLAYIT=0
-FBSMP_PLAYIT_RESTART_CMD=systemctl restart fb-smp-playit.service
+FBSMP_PLAYIT_RESTART_CMD="systemctl restart fb-smp-playit.service"
 EOF
 
 mkdir -p "$SERVER/tools"
