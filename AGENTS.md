@@ -97,6 +97,15 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   `/opt/fb-smp-repo`, then run `deploy/deploy.sh`. It is idempotent and preserves
   `/opt/fb-smp/server`. `.github/workflows/deploy-vps.yml` calls it over SSH on
   every push to `main` (needs `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY` repo secrets).
+- `deploy/vps-bootstrap.sh` is the full one-command bootstrap (prereqs, clone,
+  install, optional encrypted world restore, optional Discord webhook, verify).
+- The installer is dry-run tested in a privileged systemd container
+  (`jrei/systemd-debian:12`) before trusting it on a real box. `deploy.sh` must
+  install `python3`, `export` every `fb-smp.env` var (run wrappers `exec`, so
+  unexported vars are lost), quote values containing spaces, give the playit unit
+  a `RuntimeDirectory=playit` (its IPC socket is `/run/playit/playitd.sock`), and
+  copy only the main plugin jars (never `-plain`/`-sources`, which have no
+  `plugin.yml` and make Paper fail to load).
 - `deploy/make-migration-bundle.sh` snapshots a stopped server's world,
   `plugins/FBSMP`, Floodgate `key.pem`, `forwarding.secret`, `server.properties`
   and the playit secret (`/workspace/playit-agent/playit.toml`) into
