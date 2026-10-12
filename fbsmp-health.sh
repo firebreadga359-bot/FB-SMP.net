@@ -82,9 +82,15 @@ restart_playit() {
 
 alert() { # $1 = message
   [[ -n "$ALERT_WEBHOOK" ]] || return 0
+  # Discord: content + strict allowed_mentions (never ping @everyone/roles).
+  # Slack/generic collectors read "text".
+  payload=$(MSG="$1" python3 -c '
+import json, os
+m = os.environ["MSG"]
+print(json.dumps({"content": m, "text": m, "allowed_mentions": {"parse": []}}))
+')
   curl -s --max-time 15 -X POST -H "Content-Type: application/json" \
-    -d "{\"content\":$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))'),\"text\":$(printf '%s' "$1" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')}" \
-    "$ALERT_WEBHOOK" >/dev/null 2>&1
+    -d "$payload" "$ALERT_WEBHOOK" >/dev/null 2>&1
   log "alert sent: $1"
 }
 

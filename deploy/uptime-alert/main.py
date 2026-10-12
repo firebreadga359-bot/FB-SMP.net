@@ -99,7 +99,13 @@ def online(kind, addr):
 
 
 def post(url, text):
-    payload = json.dumps({"content": text, "text": text}).encode()
+    # Discord: content + strict allowed_mentions so it can never ping @everyone.
+    # Slack/generic collectors read "text".
+    payload = json.dumps({
+        "content": text,
+        "text": text,
+        "allowed_mentions": {"parse": []},
+    }).encode()
     req = urllib.request.Request(url, data=payload,
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=20) as r:
@@ -107,7 +113,7 @@ def post(url, text):
 
 
 def main():
-    webhook = get_secret("FBSMP_ALERT_WEBHOOK")
+    webhook = get_secret("DISCORD_WEBHOOK_URL") or get_secret("FBSMP_ALERT_WEBHOOK")
     java = get_secret("FBSMP_JAVA_ADDR") or JAVA
     bedrock = get_secret("FBSMP_BEDROCK_ADDR") or BEDROCK
 

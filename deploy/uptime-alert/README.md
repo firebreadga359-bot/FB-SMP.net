@@ -6,21 +6,38 @@ no LLM, no SDK - so a run is cheap and cannot hallucinate.
 
 There are two ways to use it. Pick one.
 
+## Where the webhook URL goes
+
+Create a Discord channel webhook (Channel settings -> Integrations -> Webhooks)
+and copy its URL. Then store it as a secret - never in the repo:
+
+- This container / agent-server:
+  ```bash
+  curl -X PUT "$AGENT_SERVER_URL/api/settings/secrets" \
+    -H "X-Session-API-Key: $SESSION_API_KEY" -H 'Content-Type: application/json' \
+    -d '{"name":"DISCORD_WEBHOOK_URL","value":"https://discord.com/api/webhooks/..."}'
+  ```
+- VPS: `printf '%s' '<url>' | sudo tee /opt/fb-smp/.fbsmp-alert-webhook >/dev/null`
+  then `sudo chmod 600 /opt/fb-smp/.fbsmp-alert-webhook`.
+
+Payloads set `allowed_mentions: {"parse": []}`, so an alert can never ping
+`@everyone` or roles.
+
 ## 1. In-process (recommended)
 
 The external health watchdog (`fbsmp-health.sh`) already checks the same
-addresses every 60s. Give it a webhook and it sends de-duplicated down/up
+addresses every 60s. Give it the webhook and it sends de-duplicated down/up
 alerts with no extra moving parts:
 
 ```bash
-# once, on the host that runs the watchdog
+# on the host that runs the watchdog
 printf '%s' 'https://discord.com/api/webhooks/...' > /opt/fb-smp/.fbsmp-alert-webhook
 chmod 600 /opt/fb-smp/.fbsmp-alert-webhook
 sudo systemctl restart fb-smp-health
 ```
 
-Any endpoint that accepts a JSON POST works: Discord (`content`), Slack or a
-generic collector (`text`). Both keys are sent, so most services accept it as-is.
+It reads the URL from `FBSMP_ALERT_WEBHOOK` or the file above. Discord reads
+`content`; Slack/generic collectors read `text` - both keys are sent.
 
 ## 2. OpenHands scheduled automation
 
