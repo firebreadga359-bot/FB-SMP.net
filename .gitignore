@@ -84,3 +84,6 @@ server/lang/
 server/logs/
 server/paper-*.jar.bak
 _staging/
+
+# Uptime alert webhook URL (secret)
+.fbsmp-alert-webhook

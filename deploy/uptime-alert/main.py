@@ -100,14 +100,15 @@ def online(kind, addr):
 
 def post(url, text):
     # Discord: content + strict allowed_mentions so it can never ping @everyone.
-    # Slack/generic collectors read "text".
+    # Slack/generic collectors read "text". Discord's edge (Cloudflare) returns
+    # 403 code 1010 for clients without a User-Agent, so always send one.
     payload = json.dumps({
         "content": text,
         "text": text,
         "allowed_mentions": {"parse": []},
     }).encode()
     req = urllib.request.Request(url, data=payload,
-                                 headers={"Content-Type": "application/json"})
+                                 headers={"Content-Type": "application/json", "User-Agent": UA})
     with urllib.request.urlopen(req, timeout=20) as r:
         r.read()
 
