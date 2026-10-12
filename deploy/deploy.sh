@@ -283,7 +283,29 @@ PAPER_XMS=$PAPER_XMS
 PAPER_XMX=$PAPER_XMX
 VELOCITY_XMS=$VELOCITY_XMS
 VELOCITY_XMX=$VELOCITY_XMX
+# Admin panel bridge: loopback panel (8765) published on the public port.
+PANEL_BRIDGE_LISTEN=0.0.0.0
+PANEL_BRIDGE_PORT=12000
+PANEL_BRIDGE_TARGET_HOST=127.0.0.1
+PANEL_BRIDGE_TARGET_PORT=8765
+# Health watchdog
+FBSMP_BASE=$INSTALL_DIR
+FBSMP_HEALTH_LOG=$INSTALL_DIR/health.log
+FBSMP_HEALTH_STATE=$INSTALL_DIR/.fbsmp-health-state
+FBSMP_PLAYIT_DIR=$INSTALL_DIR/playit
+FBSMP_PLAYIT_BIN=./playit
+FBSMP_PLAYIT_SECRET=./playit.toml
+FBSMP_BRIDGE_DIR=$SERVER
+FBSMP_BRIDGE_CMD=python3 $SERVER/tools/panel_bridge.py
+FBSMP_PANEL_URL=http://127.0.0.1:12000/
+FBSMP_MANAGE_PLAYIT=0
+FBSMP_PLAYIT_RESTART_CMD=systemctl restart fb-smp-playit.service
 EOF
+
+mkdir -p "$SERVER/tools"
+cp "$REPO_ROOT/tools/panel_bridge.py" "$SERVER/tools/panel_bridge.py"
+cp "$REPO_ROOT/fbsmp-health.sh" "$INSTALL_DIR/fbsmp-health.sh"
+chmod 0755 "$INSTALL_DIR/fbsmp-health.sh"
 
 cat > "$SERVER/run-paper.sh" <<EOF
 #!/usr/bin/env bash
@@ -307,7 +329,20 @@ set -euo pipefail
 cd "$INSTALL_DIR/playit"
 exec ./playit --secret-path ./playit.toml
 EOF
-chmod 0755 "$SERVER/run-paper.sh" "$SERVER/run-velocity.sh" "$INSTALL_DIR/playit/run-playit.sh"
+cat > "$INSTALL_DIR/run-panel-bridge.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$INSTALL_DIR/fb-smp.env"
+exec python3 "$SERVER/tools/panel_bridge.py"
+EOF
+cat > "$INSTALL_DIR/run-health.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$INSTALL_DIR/fb-smp.env"
+exec bash "$INSTALL_DIR/fbsmp-health.sh"
+EOF
+chmod 0755 "$SERVER/run-paper.sh" "$SERVER/run-velocity.sh" "$INSTALL_DIR/playit/run-playit.sh" \
+           "$INSTALL_DIR/run-panel-bridge.sh" "$INSTALL_DIR/run-health.sh"
 
 # ---------------------------------------------------------------------------
 # 8. systemd units
@@ -371,6 +406,44 @@ RestartSec=15
 WantedBy=multi-user.target
 EOF
 
+cat > /etc/systemd/system/fb-smp-panel-bridge.service <<EOF
+[Unit]
+Description=FB-SMP admin panel ingress bridge
+After=network-online.target fb-smp-paper.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+WorkingDirectory=$SERVER
+ExecStart=$INSTALL_DIR/run-panel-bridge.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /etc/systemd/system/fb-smp-health.service <<EOF
+[Unit]
+Description=FB-SMP external health watchdog
+After=network-online.target fb-smp-velocity.service fb-smp-playit.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/run-health.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 cat > /etc/systemd/system/fb-smp-backup.service <<EOF
 [Unit]
 Description=FB-SMP nightly backup
@@ -403,13 +476,16 @@ chmod 0600 "$INSTALL_DIR/playit/playit.toml" 2>/dev/null || true
 # ---------------------------------------------------------------------------
 say "Enabling and starting services"
 systemctl daemon-reload
-systemctl enable fb-smp-paper.service fb-smp-velocity.service fb-smp-playit.service
+systemctl enable fb-smp-paper.service fb-smp-velocity.service fb-smp-playit.service \
+                 fb-smp-panel-bridge.service fb-smp-health.service
 systemctl enable --now fb-smp-backup.timer
 systemctl restart fb-smp-paper.service
 # give Paper time to become ready before the proxy dials in
 sleep 25
 systemctl restart fb-smp-velocity.service
 systemctl restart fb-smp-playit.service
+systemctl restart fb-smp-panel-bridge.service
+systemctl restart fb-smp-health.service
 
 say "Disabling the old orchestrator scripts to avoid double starts"
 chmod -x "$REPO_ROOT/start.sh" 2>/dev/null || true
@@ -419,8 +495,8 @@ chmod -x "$REPO_ROOT/stop.sh" 2>/dev/null || true
 # 10. Status
 # ---------------------------------------------------------------------------
 say "Done. Service status:"
-for s in fb-smp-paper fb-smp-velocity fb-smp-playit; do
-  printf '  %-18s %s\n' "$s" "$(systemctl is-active "$s" 2>/dev/null || true)"
+for s in fb-smp-paper fb-smp-velocity fb-smp-playit fb-smp-panel-bridge fb-smp-health; do
+  printf '  %-24s %s\n' "$s" "$(systemctl is-active "$s" 2>/dev/null || true)"
 done
 
 cat <<EOF
@@ -429,9 +505,21 @@ Logs:
   journalctl -u fb-smp-paper -f
   journalctl -u fb-smp-velocity -f
   journalctl -u fb-smp-playit -f
+  journalctl -u fb-smp-panel-bridge -f
+  journalctl -u fb-smp-health -f
+
+Admin panel: the bridge publishes the loopback panel on port 12000.
+  - LAN/VPN:  http://<this-host-ip>:12000/
+  - Public:   put nginx/Caddy in front of 127.0.0.1:12000 with TLS, then
+              browse https://<your-domain>/
+  Log in with the panel account created earlier (OWNER). Change the password
+  after first login. The owner token in server/plugins/FBSMP/admin-token is a
+  break-glass OWNER credential - rotate it once you are in.
 
 Firewall: for internet play the playit.gg tunnel needs NO inbound ports.
 To also allow direct LAN/direct-IP Java play, open inbound TCP 25565.
+To reach the panel directly (no reverse proxy), open inbound TCP 12000 and
+prefer an SSH tunnel instead:  ssh -L 12000:127.0.0.1:12000 user@host
 
 Bedrock (playit.gg): read the tunnel address with
   journalctl -u fb-smp-playit -f
