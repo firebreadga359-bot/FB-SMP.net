@@ -64,6 +64,16 @@ say "Copying forwarding secret and server config"
 [[ -f "$SRC/server.properties" ]] && cp -a "$SRC/server.properties" "$STAGE/"
 [[ -f "$SRC/config/paper-global.yml" ]] && { mkdir -p "$STAGE/config"; cp -a "$SRC/config/paper-global.yml" "$STAGE/config/"; }
 
+# --- playit.gg secret (keeps the same public Java + Bedrock addresses) -----
+PLAYIT_TOML="${PLAYIT_SECRET_FILE:-/workspace/playit-agent/playit.toml}"
+if [[ -f "$PLAYIT_TOML" ]]; then
+  say "Including playit secret ($PLAYIT_TOML)"
+  mkdir -p "$STAGE/playit"
+  cp -a "$PLAYIT_TOML" "$STAGE/playit/playit.toml"
+else
+  say "No playit secret found at $PLAYIT_TOML - a new tunnel must be claimed"
+fi
+
 # Drop transient SQLite sidecars and plugin caches from the snapshot.
 rm -f "$STAGE/plugins/FBSMP/"*.sqlite-wal "$STAGE/plugins/FBSMP/"*.sqlite-shm 2>/dev/null || true
 
