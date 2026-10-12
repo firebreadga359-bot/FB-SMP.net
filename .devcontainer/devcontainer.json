@@ -1,0 +1,18 @@
+{
+  "name": "FB-SMP host",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "25",
+      "installGradle": false,
+      "installMaven": false
+    }
+  },
+  "portsAttributes": {
+    "12000": {
+      "label": "FB-SMP admin panel",
+      "visibility": "public",
+      "onAutoForward": "silent"
+    }
+  },
+  "postStartCommand": "bash -lc 'sudo ln -sfn /workspaces /workspace 2>/dev/null || true; if [ ! -e /workspaces/jdk25/jdk-25.0.4.1+1 ]; then JH=$(dirname \"$(dirname \"$(readlink -f \"$(command -v java)\")\")\"); mkdir -p /workspaces/jdk25; ln -sfn \"$JH\" /workspaces/jdk25/jdk-25.0.4.1+1 2>/dev/null || true; fi; if [ -x /workspaces/fbsmp-keeper.sh ]; then if ! pgrep -f fbsmp-keeper.sh >/dev/null 2>&1; then setsid nohup /workspaces/fbsmp-keeper.sh >>/workspaces/keeper.log 2>&1 </dev/null & fi; fi; true'"
+}
