@@ -93,6 +93,12 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   `tools/panel_bridge.py` and installs `fb-smp-panel-bridge` + `fb-smp-health`
   systemd units. On a VPS set `FBSMP_MANAGE_PLAYIT=0` so the watchdog restarts
   the playit *unit* instead of starting a duplicate agent.
+- `deploy/provision-vps.sh` is the one-shot entrypoint: clone/update the repo to
+  `/opt/fb-smp-repo`, then run `deploy/deploy.sh`. It is idempotent and preserves
+  `/opt/fb-smp/server`. `.github/workflows/deploy-vps.yml` calls it over SSH on
+  every push to `main` (needs `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY` repo secrets).
+- The workflow only runs from the default branch, so it activates once the
+  deploy work is on `main` (i.e. after this PR merges).
 - `fbsmp-health.sh` is portable: it reads all paths from `FBSMP_*` env vars
   (container defaults), checks Java/Bedrock through `api.mcstatus.io`, and can
   post de-duplicated down/up alerts to a webhook via `FBSMP_ALERT_WEBHOOK` or
