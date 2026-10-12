@@ -58,6 +58,16 @@ jobs:
             gh codespace ssh -c "$CS" -- 'setsid nohup /workspaces/fbsmp-keeper.sh >>/workspaces/keeper.log 2>&1 </dev/null & sleep 4; pgrep -cf fbsmp-keeper.sh' || true
           fi
 
+      - name: Ensure admin panel port is public and bridge is up
+        if: ${{ env.GH_TOKEN != '' }}
+        run: |
+          gh codespace ports visibility 12000:public -c "$CS" || true
+          if ! gh codespace ssh -c "$CS" -- 'curl -sf -o /dev/null --max-time 8 http://127.0.0.1:12000/health || curl -s -o /dev/null --max-time 8 http://127.0.0.1:12000/'; then
+            echo "panel bridge not answering on 12000"
+          else
+            echo "panel bridge ok"
+          fi
+
       - name: Restart playit if a tunnel is down
         if: ${{ env.GH_TOKEN != '' }}
         run: |
