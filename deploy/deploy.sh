@@ -88,13 +88,20 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y curl ca-certificates tar sqlite3 coreutils python3
 
+# Map the host CPU to the names Adoptium and the playit agent use.
+case "$(uname -m)" in
+  x86_64|amd64)  JDK_ARCH=x64;    PLAYIT_ARCH=amd64 ;;
+  aarch64|arm64) JDK_ARCH=aarch64; PLAYIT_ARCH=aarch64 ;;
+  *) die "Unsupported CPU architecture: $(uname -m)" ;;
+esac
+
 if [[ -x "$INSTALL_DIR/jdk25/bin/java" ]] && "$INSTALL_DIR/jdk25/bin/java" -version 2>&1 | grep -q "\"$JDK_MAJOR"; then
   say "Java $JDK_MAJOR already installed at $INSTALL_DIR/jdk25"
 else
-  say "Installing Temurin JDK $JDK_MAJOR"
+  say "Installing Temurin JDK $JDK_MAJOR ($JDK_ARCH)"
   mkdir -p "$INSTALL_DIR/jdk25"
   curl -fsSL --retry 3 -o "$STAGE.tmp-jdk.tar.gz" \
-    "https://api.adoptium.net/v3/binary/latest/${JDK_MAJOR}/ga/linux/x64/jdk/hotspot/normal/eclipse"
+    "https://api.adoptium.net/v3/binary/latest/${JDK_MAJOR}/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse"
   tar -xzf "$STAGE.tmp-jdk.tar.gz" -C "$INSTALL_DIR/jdk25" --strip-components=1
   rm -f "$STAGE.tmp-jdk.tar.gz"
 fi
@@ -144,9 +151,9 @@ fetch "https://github.com/ViaVersion/ViaVersion/releases/download/${VIA_VER}/Via
 fetch "https://github.com/ViaVersion/ViaBackwards/releases/download/${VIA_VER}/ViaBackwards-${VIA_VER}.jar" \
       "$STAGE/ViaBackwards-${VIA_VER}.jar" "$VIA_BW_SHA"
 
-say "Downloading playit agent $PLAYIT_VER"
+say "Downloading playit agent $PLAYIT_VER ($PLAYIT_ARCH)"
 curl -fsSL --retry 3 -o "$STAGE/playit" \
-  "https://github.com/playit-cloud/playit-agent/releases/download/${PLAYIT_VER}/playit-linux-amd64"
+  "https://github.com/playit-cloud/playit-agent/releases/download/${PLAYIT_VER}/playit-linux-${PLAYIT_ARCH}"
 
 # ---------------------------------------------------------------------------
 # 4. Lay out the server directory from the repo
