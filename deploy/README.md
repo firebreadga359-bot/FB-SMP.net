@@ -8,10 +8,24 @@ that restart on crash and on reboot.
 ## One-shot provisioning (recommended)
 
 On a fresh box, one command does everything - install prerequisites, clone the
-repository to a stable path, and run the installer:
+repository to a stable path, run the installer, restore your existing world
+from an encrypted bundle, arm Discord alerts, and verify:
 
 ```bash
-sudo bash deploy/provision-vps.sh
+sudo FBSMP_BUNDLE=/root/fbsmp-migrate.tar.gz.enc \
+     FBSMP_BUNDLE_PASS_FILE=/root/migrate.pass \
+     FBSMP_ALERT_WEBHOOK_FILE=/root/webhook.txt \
+     bash deploy/vps-bootstrap.sh
+```
+
+Every input is optional. With no `FBSMP_BUNDLE` it installs a fresh server;
+with no webhook it skips alerting. Re-running is safe: the world is only
+replaced when a bundle is supplied.
+
+The lower-level entrypoints are also available:
+
+```bash
+sudo bash deploy/provision-vps.sh   # clone/update + install only
 ```
 
 Re-running it pulls the latest code and re-applies the install. The world and
