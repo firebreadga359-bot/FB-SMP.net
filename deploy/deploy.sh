@@ -172,12 +172,15 @@ elif [[ -f "$REPO_ROOT/paper-global.yml" ]]; then
   cp "$REPO_ROOT/paper-global.yml" "$SERVER/config/paper-global.yml"
 fi
 
-# FB-SMP plugin jars (build them with ./gradlew build if missing)
-if compgen -G "$REPO_ROOT/fbsmp-paper/build/libs/fbsmp-paper-*.jar" >/dev/null; then
+# FB-SMP plugin jars (build them with ./gradlew build if missing).
+# Only the main jars: -plain and -sources must never be loaded as plugins.
+if compgen -G "$REPO_ROOT/fbsmp-paper/build/libs/fbsmp-paper-[0-9]*.jar" >/dev/null; then
   cp "$REPO_ROOT/fbsmp-paper/build/libs/fbsmp-paper-"*.jar "$SERVER/plugins/"
+  rm -f "$SERVER/plugins/fbsmp-paper-"*-plain.jar "$SERVER/plugins/fbsmp-paper-"*-sources.jar
 fi
-if compgen -G "$REPO_ROOT/fbsmp-velocity/build/libs/fbsmp-velocity-*.jar" >/dev/null; then
+if compgen -G "$REPO_ROOT/fbsmp-velocity/build/libs/fbsmp-velocity-[0-9]*.jar" >/dev/null; then
   cp "$REPO_ROOT/fbsmp-velocity/build/libs/fbsmp-velocity-"*.jar "$SERVER/plugins/"
+  rm -f "$SERVER/plugins/fbsmp-velocity-"*-plain.jar "$SERVER/plugins/fbsmp-velocity-"*-sources.jar
 fi
 [[ -f "$REPO_ROOT/plugins/fbsmp-paper-1.0.0.jar" ]] && cp "$REPO_ROOT/plugins/fbsmp-paper-1.0.0.jar" "$SERVER/plugins/"
 [[ -f "$REPO_ROOT/plugins/fbsmp-velocity-1.0.0.jar" ]] && cp "$REPO_ROOT/plugins/fbsmp-velocity-1.0.0.jar" "$SERVER/plugins/"
