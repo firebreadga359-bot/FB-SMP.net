@@ -23,6 +23,8 @@ PLAYIT_SECRET="${FBSMP_PLAYIT_SECRET:-./playit.toml}"
 BRIDGE_DIR="${FBSMP_BRIDGE_DIR:-$BASE/fb-smp}"
 BRIDGE_CMD="${FBSMP_BRIDGE_CMD:-python3 tools/panel_bridge.py}"
 SUPERVISE="${FBSMP_SUPERVISE:-}"
+SUPERVISE_SCRIPT="${FBSMP_SUPERVISE_SCRIPT:-$BASE/supervise.sh}"
+SUPERVISE_LOCK="${FBSMP_SUPERVISE_LOCK:-$BASE/supervise.lock}"
 LOCK="${FBSMP_HEALTH_LOCK:-$BASE/.fbsmp-health.lock}"
 INTERVAL="${FBSMP_HEALTH_INTERVAL:-60}"
 # playit handling: on a bare container the watchdog starts/restarts the agent
@@ -65,6 +67,16 @@ ensure_bridge() {
   log "panel bridge missing -> starting"
   ( cd "$BRIDGE_DIR" && nohup $BRIDGE_CMD >>"$BASE/panel-bridge.log" 2>&1 & )
 }
+# Mutual supervision: the watchdog keeps the stack loop alive. Without this the
+# two loops only restart each other on a container restart (via bashrc), so a
+# crash in either would leave the stack unmonitored.
+ensure_supervisor() {
+  [[ -n "$SUPERVISE" && -f "$SUPERVISE_SCRIPT" ]] || return 0
+  pgrep -f "supervise.sh" >/dev/null 2>&1 && return 0
+  log "supervisor missing -> restarting"
+  rm -f "$SUPERVISE_LOCK"
+  SUPERVISE="$SUPERVISE" setsid nohup bash "$SUPERVISE_SCRIPT" >>"$BASE/supervisor.log" 2>&1 </dev/null &
+}
 restart_playit() {
   [[ "$MANAGE_PLAYIT" == 1 ]] || return 0
   log "restarting playit agent (tunnel unreachable)"
@@ -94,20 +106,30 @@ print(json.dumps({"content": m, "text": m, "allowed_mentions": {"parse": []}}))
   log "alert sent: $1"
 }
 
-exec 8>"$LOCK"
-if ! flock -n 8; then
-  log "another health watchdog already holds the lock; exiting"
-  exit 0
+# Single-instance guard via PID file (not flock): flock descriptors are
+# inherited by spawned children, which would hold the lock after this loop dies
+# and block its replacement. A dead loop becomes a zombie in this container
+# (no init reaps it), and kill -0 treats zombies as alive, so read the process
+# state and treat Z as dead.
+if [[ -f "$LOCK" ]]; then
+  _old="$(cat "$LOCK" 2>/dev/null)"
+  _state="$(awk '{print $3}' "/proc/${_old:-0}/stat" 2>/dev/null)"
+  if [[ "$_old" =~ ^[0-9]+$ && -n "$_state" && "$_state" != Z ]]; then
+    log "another health watchdog (pid $_old) is running; exiting"
+    exit 0
+  fi
 fi
+echo $$ >"$LOCK"
 
 if [[ "${1:-}" == "--once" ]]; then
-  ensure_playit; ensure_bridge
+  ensure_supervisor; ensure_playit; ensure_bridge
   log "once: java=$(ext_up java "$JAVA_HOST" && echo ok || echo DOWN) bedrock=$(ext_up bedrock "$BEDROCK_HOST" && echo ok || echo DOWN) panel=$(panel_up && echo ok || echo DOWN)"
   exit 0
 fi
 
 log "health watchdog started (pid $$)"
 while true; do
+  ensure_supervisor
   ensure_playit
   ensure_bridge
 
