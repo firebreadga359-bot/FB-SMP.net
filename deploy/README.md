@@ -100,6 +100,43 @@ rotate it once you are in.
 Data lives in `/opt/fb-smp/server` (world, plugins, backups). Nightly backups
 run at 04:30 via `fb-smp-backup.timer`, writing to `/opt/fb-smp/server/backups`.
 
+## Moving an existing world and player data
+
+To carry a live server over to the VPS without losing builds, balances or
+Bedrock player identities, snapshot it and unpack the snapshot into
+`/opt/fb-smp/server`.
+
+On the **source** host (stop the server first - a running server makes the
+world and SQLite database inconsistent):
+
+```bash
+# stop whatever is running the server, then:
+sudo bash deploy/make-migration-bundle.sh /workspace/fb-smp/server /workspace/fbsmp-migrate.tar.gz
+```
+
+The bundle contains the world, `plugins/FBSMP` (economy DB, dashboard accounts,
+shop config), the Floodgate `key.pem` (keeps Bedrock players linked), the
+Velocity `forwarding.secret` and `server.properties`.
+
+On the **VPS**, with the stack already installed and stopped:
+
+```bash
+sudo systemctl stop fb-smp-paper fb-smp-velocity fb-smp-playit \
+                    fb-smp-panel-bridge fb-smp-health
+sudo tar -xzf /root/fbsmp-migrate.tar.gz -C /opt/fb-smp/server
+sudo chown -R fbsmp:fbsmp /opt/fb-smp/server
+sudo systemctl start fb-smp-paper
+sleep 25
+sudo systemctl start fb-smp-velocity fb-smp-playit fb-smp-panel-bridge fb-smp-health
+```
+
+Then confirm the public addresses and, on the source host, **stop the old
+server permanently** so two copies never share a world.
+
+Reusing the source `playit.toml` (installed by `provision-vps.sh` from
+`PLAYIT_SECRET_FILE`, or copied to `/opt/fb-smp/playit/playit.toml`) keeps the
+same public Java and Bedrock addresses, so players do not need to change them.
+
 ## Upgrading a version
 
 Edit the pinned versions/checksums at the top of `deploy/deploy.sh`, then re-run
