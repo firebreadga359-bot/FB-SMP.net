@@ -86,7 +86,7 @@ build_plugins() {
 say "Installing base packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y curl ca-certificates tar sqlite3 coreutils
+apt-get install -y curl ca-certificates tar sqlite3 coreutils python3
 
 if [[ -x "$INSTALL_DIR/jdk25/bin/java" ]] && "$INSTALL_DIR/jdk25/bin/java" -version 2>&1 | grep -q "\"$JDK_MAJOR"; then
   say "Java $JDK_MAJOR already installed at $INSTALL_DIR/jdk25"
