@@ -278,30 +278,30 @@ fi
 # ---------------------------------------------------------------------------
 say "Writing run wrappers and environment file"
 cat > "$INSTALL_DIR/fb-smp.env" <<EOF
-JAVA_BIN=$JAVA_BIN
-PAPER_XMS=$PAPER_XMS
-PAPER_XMX=$PAPER_XMX
-VELOCITY_XMS=$VELOCITY_XMS
-VELOCITY_XMX=$VELOCITY_XMX
+export JAVA_BIN=$JAVA_BIN
+export PAPER_XMS=$PAPER_XMS
+export PAPER_XMX=$PAPER_XMX
+export VELOCITY_XMS=$VELOCITY_XMS
+export VELOCITY_XMX=$VELOCITY_XMX
 # Admin panel bridge: loopback panel (8765) reached over an SSH tunnel.
 # Bind loopback-only so the panel is never exposed to the public internet;
 # remote operators forward the port, e.g. ssh -L 12000:127.0.0.1:12000 user@vps
-PANEL_BRIDGE_LISTEN=127.0.0.1
-PANEL_BRIDGE_PORT=12000
-PANEL_BRIDGE_TARGET_HOST=127.0.0.1
-PANEL_BRIDGE_TARGET_PORT=8765
+export PANEL_BRIDGE_LISTEN=127.0.0.1
+export PANEL_BRIDGE_PORT=12000
+export PANEL_BRIDGE_TARGET_HOST=127.0.0.1
+export PANEL_BRIDGE_TARGET_PORT=8765
 # Health watchdog
-FBSMP_BASE=$INSTALL_DIR
-FBSMP_HEALTH_LOG=$INSTALL_DIR/health.log
-FBSMP_HEALTH_STATE=$INSTALL_DIR/.fbsmp-health-state
-FBSMP_PLAYIT_DIR=$INSTALL_DIR/playit
-FBSMP_PLAYIT_BIN=./playit
-FBSMP_PLAYIT_SECRET=./playit.toml
-FBSMP_BRIDGE_DIR=$SERVER
-FBSMP_BRIDGE_CMD="python3 $SERVER/tools/panel_bridge.py"
-FBSMP_PANEL_URL=http://127.0.0.1:12000/
-FBSMP_MANAGE_PLAYIT=0
-FBSMP_PLAYIT_RESTART_CMD="systemctl restart fb-smp-playit.service"
+export FBSMP_BASE=$INSTALL_DIR
+export FBSMP_HEALTH_LOG=$INSTALL_DIR/health.log
+export FBSMP_HEALTH_STATE=$INSTALL_DIR/.fbsmp-health-state
+export FBSMP_PLAYIT_DIR=$INSTALL_DIR/playit
+export FBSMP_PLAYIT_BIN=./playit
+export FBSMP_PLAYIT_SECRET=./playit.toml
+export FBSMP_BRIDGE_DIR=$SERVER
+export FBSMP_BRIDGE_CMD="python3 $SERVER/tools/panel_bridge.py"
+export FBSMP_PANEL_URL=http://127.0.0.1:12000/
+export FBSMP_MANAGE_PLAYIT=0
+export FBSMP_PLAYIT_RESTART_CMD="systemctl restart fb-smp-playit.service"
 EOF
 
 mkdir -p "$SERVER/tools"
