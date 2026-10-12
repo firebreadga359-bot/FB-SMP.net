@@ -400,6 +400,10 @@ StartLimitIntervalSec=0
 Type=simple
 User=$SERVICE_USER
 WorkingDirectory=$INSTALL_DIR/playit
+# playit binds an IPC socket at /run/playit/playitd.sock; systemd creates and
+# owns this directory for the service user.
+RuntimeDirectory=playit
+RuntimeDirectoryMode=0750
 ExecStart=$INSTALL_DIR/playit/run-playit.sh
 Restart=always
 RestartSec=15
