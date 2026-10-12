@@ -219,6 +219,12 @@
           and are read by the server owners. Please do not include sensitive information.</p>
       </form>
     </div>
+
+    <div class="form-card" id="signup-fallback" hidden>
+      <h3 style="margin-top:0">Sign up on the FB-SMP site</h3>
+      <p class="note">The sign-up form is handled on the FB-SMP server site. Open it there to send your request.</p>
+      <a class="btn primary" href="https://fb-smp.birta.link/#signup">Open the sign-up form</a>
+    </div>
   </section>
 
 </main>
@@ -262,6 +268,15 @@
   var form = document.getElementById('join-form');
   var status = document.getElementById('status');
   var submitBtn = document.getElementById('submit-btn');
+
+  // Birta's form intake has no CORS headers, so submissions only work on the
+  // site's own host. Off that host, show a link to the form instead.
+  var FORM_HOSTS = ['fb-smp.birta.link', 'fb-smp.net', 'www.fb-smp.net'];
+  var onFormHost = FORM_HOSTS.indexOf(location.hostname) !== -1;
+  if (!onFormHost) {
+    document.getElementById('join-form').hidden = true;
+    document.getElementById('signup-fallback').hidden = false;
+  }
 
   function show(cls, msg) {
     status.className = 'status ' + cls;
