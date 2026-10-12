@@ -34,7 +34,7 @@ this same script, so a push to `main` becomes a live update.
 
 ## Requirements
 
-- A Debian 12+ / Ubuntu 22.04+ VPS (x86_64). 2 vCPU / 4 GB RAM / 20 GB disk minimum.
+- A Debian 12+ / Ubuntu 22.04+ VPS (x86_64 **or** ARM64/aarch64). 2 vCPU / 4 GB RAM / 20 GB disk minimum. The ARM64 path suits Oracle Cloud Always Free (Ampere A1) and Raspberry Pi; the installer picks the matching JDK and playit agent automatically.
 - Root access.
 - The server must not be running anywhere else at the same time. Two copies
   sharing one world or one set of plugin data will corrupt it.
