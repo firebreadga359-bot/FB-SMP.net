@@ -5,6 +5,19 @@ Velocity, Geyser/Floodgate, ViaVersion/ViaBackwards, the playit.gg agent, the
 admin panel ingress bridge and an external health watchdog as systemd services
 that restart on crash and on reboot.
 
+## One-shot provisioning (recommended)
+
+On a fresh box, one command does everything - install prerequisites, clone the
+repository to a stable path, and run the installer:
+
+```bash
+sudo bash deploy/provision-vps.sh
+```
+
+Re-running it pulls the latest code and re-applies the install. The world and
+secrets on the VPS are never overwritten. The GitHub auto-deploy workflow calls
+this same script, so a push to `main` becomes a live update.
+
 ## Requirements
 
 - A Debian 12+ / Ubuntu 22.04+ VPS (x86_64). 2 vCPU / 4 GB RAM / 20 GB disk minimum.
@@ -91,3 +104,41 @@ run at 04:30 via `fb-smp-backup.timer`, writing to `/opt/fb-smp/server/backups`.
 
 Edit the pinned versions/checksums at the top of `deploy/deploy.sh`, then re-run
 it. Secrets are preserved; the world is never overwritten on re-run.
+
+## Automatic deploys from GitHub
+
+`.github/workflows/deploy-vps.yml` runs `provision-vps.sh` on the VPS after
+every push to `main` (and on manual dispatch), so the repository is the single
+source of truth and pushing is all it takes to update the live server.
+
+Set these **repository secrets** (Settings -> Secrets and variables -> Actions):
+
+| Secret | Required | Meaning |
+|---|---|---|
+| `VPS_HOST` | yes | Hostname or IP of the VPS |
+| `VPS_USER` | yes | SSH user with passwordless sudo (or `root`) |
+| `VPS_SSH_KEY` | yes | Private key whose public half is in that user's `~/.ssh/authorized_keys` |
+| `VPS_PORT` | no | SSH port (default `22`) |
+| `VPS_REPO_DIR` | no | Checkout path on the VPS (default `/opt/fb-smp-repo`) |
+
+Prepare the VPS side once:
+
+```bash
+# on your workstation
+ssh-keygen -t ed25519 -C fb-smp-deploy -f ~/.ssh/fbsmp_deploy -N ''
+ssh-copy-id -i ~/.ssh/fbsmp_deploy.pub <VPS_USER>@<VPS_HOST>
+# paste the private key (~/.ssh/fbsmp_deploy) into the VPS_SSH_KEY secret
+
+# on the VPS: let the deploy user run the installer without a password
+echo "<VPS_USER> ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/fbsmp-deploy
+sudo chmod 440 /etc/sudoers.d/fbsmp-deploy
+```
+
+Safety notes:
+
+- The workflow fails fast with a clear message if the secrets are missing; it
+  never touches a host it cannot authenticate to.
+- The installer is idempotent. On re-run it preserves `/opt/fb-smp/server`
+  (world, plugin data, secrets) and only refreshes code, jars and units.
+- If you keep the live server in this sandbox as well, **stop one of them**.
+  Two servers sharing a world will corrupt it.
