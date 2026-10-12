@@ -67,3 +67,20 @@ server/backups/
 *.log
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
+
+# FB-SMP runtime / server state (not source)
+server/forwarding.secret
+server/eula.txt
+server/*.pid
+server/ops.json
+server/banned-ips.json
+server/banned-players.json
+server/usercache.json
+server/whitelist.json
+server/version_history.json
+server/.paper/
+server/config/
+server/lang/
+server/logs/
+server/paper-*.jar.bak
+_staging/

@@ -27,6 +27,7 @@ public final class FbsmpPlugin extends JavaPlugin {
     private FbsmpDatabase database;
     private PrivateAdminPanel adminPanel;
     private Messages messages;
+    private ShopMenu shopMenu;
     private long startedAtMillis;
 
     @Override
@@ -61,6 +62,7 @@ public final class FbsmpPlugin extends JavaPlugin {
         PlayerListener playerListener = new PlayerListener(this, database);
         new ModerationListener(this, database);
         ShopMenu shopMenu = new ShopMenu(this, database, playerListener);
+        this.shopMenu = shopMenu;
         SellService sellService = new SellService(shopMenu, new SellEligibilityPolicy(
                 SellEligibilityPolicy.Config.defaults()));
         SellMenu sellMenu = new SellMenu(this, database, playerListener, sellService);
@@ -111,9 +113,10 @@ public final class FbsmpPlugin extends JavaPlugin {
                 }
             }, 20L * 60, 20L * 60);
         }
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this, this::tickDashboard, 20L * 15, 20L * 15);
         if (getConfig().getBoolean("admin-panel.enabled", true)) {
             try {
-                adminPanel = new PrivateAdminPanel(this, database);
+                adminPanel = new PrivateAdminPanel(this, database, shopMenu);
                 adminPanel.start();
             } catch (IOException | IllegalArgumentException exception) {
                 getLogger().severe("The private admin panel could not start: " + exception.getMessage());
@@ -140,6 +143,10 @@ public final class FbsmpPlugin extends JavaPlugin {
         return database;
     }
 
+    public ShopMenu shopMenu() {
+        return shopMenu;
+    }
+
     public void backupDatabase() throws SQLException, IOException {
         Path backupDirectory = getDataFolder().toPath().resolve("backups");
         java.nio.file.Files.createDirectories(backupDirectory);
@@ -158,6 +165,36 @@ public final class FbsmpPlugin extends JavaPlugin {
 
     public long uptimeSeconds() {
         return Math.max(0L, (System.currentTimeMillis() - startedAtMillis) / 1000L);
+    }
+
+    /** Delivers queued announcements and runs due scheduled tasks (async tick). */
+    private void tickDashboard() {
+        if (database == null) {
+            return;
+        }
+        try {
+            for (var announcement : database.pendingAnnouncements()) {
+                final String message = announcement.message();
+                Bukkit.getScheduler().runTask(this, () -> Bukkit.broadcastMessage(
+                        org.bukkit.ChatColor.GOLD + "[FB-SMP] " + org.bukkit.ChatColor.WHITE + message));
+                database.markAnnouncementDelivered(announcement.id(), System.currentTimeMillis());
+            }
+            long now = System.currentTimeMillis();
+            for (var task : database.dueScheduledTasks(now)) {
+                final String payload = task.payload();
+                if (task.kind().equals("ANNOUNCE")) {
+                    Bukkit.getScheduler().runTask(this, () -> Bukkit.broadcastMessage(
+                            org.bukkit.ChatColor.GOLD + "[FB-SMP] " + org.bukkit.ChatColor.WHITE + payload));
+                } else {
+                    Bukkit.getScheduler().runTask(this, () ->
+                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), payload));
+                }
+                long interval = Math.max(1, task.intervalMinutes()) * 60_000L;
+                database.markScheduledTaskRun(task.id(), now + interval, now);
+            }
+        } catch (SQLException exception) {
+            getLogger().warning("Dashboard scheduler tick failed: " + exception.getMessage());
+        }
     }
 
     private void saveResourceIfMissing(String name) {

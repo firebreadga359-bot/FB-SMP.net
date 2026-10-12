@@ -2,130 +2,316 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="color-scheme" content="dark">
     <title>FB-SMP Control Room</title>
     <style>
       :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eaf0f7;background:#0c1118;font-synthesis:none;text-rendering:optimizeLegibility}
       *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 82% -5%,#25251e 0,transparent 38%),#0c1118}
-      .shell{max-width:1160px;margin:auto;padding:36px 24px}.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #26313d;padding-bottom:24px;margin-bottom:30px}
+      .shell{max-width:1180px;margin:auto;padding:28px 20px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #26313d;padding-bottom:20px;margin-bottom:22px;flex-wrap:wrap}
       .brand{display:flex;gap:14px;align-items:center}.mark{width:42px;height:42px;border-radius:13px;background:linear-gradient(145deg,#f0bd61,#bd7727);display:grid;place-items:center;color:#20170b;font-weight:900;font-size:19px;box-shadow:0 8px 28px #e0a44b24}
       h1{font-size:19px;margin:0;letter-spacing:-.03em}.sub{font-size:12px;color:#8d9aaa;margin-top:5px}.status{font-size:12px;color:#79d2a1;display:flex;gap:8px;align-items:center}.dot{width:7px;height:7px;background:#4dc886;border-radius:50%;box-shadow:0 0 0 4px #4dc88622}
-      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.metric,.panel{background:#131b25;border:1px solid #26313d;border-radius:14px}.metric{padding:19px}.metric span{display:block;color:#92a0af;font-size:12px}.metric strong{display:block;font-size:24px;margin-top:14px;letter-spacing:-.04em}.metric em{font-style:normal;font-size:11px;color:#d6a953;display:block;margin-top:6px}
-      .panel{margin-top:18px;padding:20px}.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.panel h2{font-size:14px;margin:0}.muted{color:#8793a0;font-size:12px}.tabs{display:flex;gap:6px;flex-wrap:wrap}.tabs button,.button{border:1px solid #303d4c;background:#18222e;color:#bac6d3;padding:9px 12px;border-radius:8px;font-size:12px;cursor:pointer}.tabs button.active{color:#f3c875;border-color:#98743c;background:#312719}.button.primary{background:#d7a751;color:#1d170c;border-color:#e7b75a;font-weight:700}.button:hover,.tabs button:hover{filter:brightness(1.15)}
-      table{width:100%;border-collapse:collapse;font-size:12px}th{color:#8896a5;text-align:left;font-weight:500;padding:10px;border-bottom:1px solid #2a3542}td{padding:12px 10px;border-bottom:1px solid #202a35;color:#dae1e8}td:last-child,th:last-child{text-align:right}.positive{color:#7fd3a5}.empty{text-align:center;color:#7f8d9c;padding:28px}.login-wrap{max-width:380px;margin:12vh auto}.login-box{padding:26px;background:#131b25;border:1px solid #2b3642;border-radius:16px}.login-box label{display:block;margin:18px 0 8px;color:#a6b3c0;font-size:12px}.login-box input{width:100%;background:#0c121a;color:white;border:1px solid #303d4c;border-radius:8px;padding:12px;font:inherit}.error{color:#f08a83;font-size:12px;min-height:18px;margin-top:10px}.hidden{display:none!important}.foot{color:#738090;font-size:11px;padding-top:18px}.action-row{display:flex;gap:8px}
-      @media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.shell{padding:22px 14px}.metric strong{font-size:20px}}@media(max-width:420px){.grid{grid-template-columns:1fr 1fr;gap:8px}.metric{padding:14px}.top{align-items:flex-start}}
+      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.metric,.panel{background:#131b25;border:1px solid #26313d;border-radius:14px}.metric{padding:18px}.metric span{display:block;color:#92a0af;font-size:12px}.metric strong{display:block;font-size:22px;margin-top:12px;letter-spacing:-.04em}.metric em{font-style:normal;font-size:11px;color:#d6a953;display:block;margin-top:6px}
+      .panel{margin-top:18px;padding:20px}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}.panel h2{font-size:14px;margin:0}.muted{color:#8793a0;font-size:12px}
+      .nav{display:flex;gap:6px;flex-wrap:wrap}.nav button,.button{border:1px solid #303d4c;background:#18222e;color:#bac6d3;padding:9px 12px;border-radius:8px;font-size:12px;cursor:pointer}.nav button.active{color:#f3c875;border-color:#98743c;background:#312719}.button.primary{background:#d7a751;color:#1d170c;border-color:#e7b75a;font-weight:700}.button.danger{background:#7a2b28;border-color:#a4423d;color:#ffe1de}.button:hover,.nav button:hover{filter:brightness(1.15)}
+      table{width:100%;border-collapse:collapse;font-size:12px}th{color:#8896a5;text-align:left;font-weight:500;padding:10px;border-bottom:1px solid #2a3542}td{padding:11px 10px;border-bottom:1px solid #202a35;color:#dae1e8;vertical-align:top}td:last-child,th:last-child{text-align:right}
+      .positive{color:#7fd3a5}.negative{color:#f08a83}.empty{text-align:center;color:#7f8d9c;padding:28px}
+      .login-wrap{max-width:400px;margin:10vh auto}.login-box{padding:26px;background:#131b25;border:1px solid #2b3642;border-radius:16px}.login-box label{display:block;margin:16px 0 8px;color:#a6b3c0;font-size:12px}
+      input,select,textarea{width:100%;background:#0c121a;color:white;border:1px solid #303d4c;border-radius:8px;padding:11px;font:inherit;font-size:13px}
+      textarea{min-height:80px;resize:vertical}.error{color:#f08a83;font-size:12px;min-height:18px;margin-top:10px}.hidden{display:none!important}.foot{color:#738090;font-size:11px;padding-top:18px}
+      .action-row{display:flex;gap:8px;flex-wrap:wrap}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}.field label{font-size:11px;color:#a6b3c0}
+      .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end}.card{background:#101822;border:1px solid #223040;border-radius:12px;padding:16px;margin-bottom:14px}
+      .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:#22303f;color:#b9c7d6;margin-right:4px}.chip.good{background:#1c3a2b;color:#8fe0b0}.chip.bad{background:#3a1f1f;color:#f2a9a4}
+      .log{background:#080d13;border:1px solid #1d2733;border-radius:10px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.6;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+      @media(max-width:820px){.grid{grid-template-columns:repeat(2,1fr)}.shell{padding:20px 12px 60px}}@media(max-width:430px){.grid{grid-template-columns:1fr 1fr;gap:8px}.metric{padding:13px}.metric strong{font-size:18px}}
     </style>
   </head>
   <body>
     <main id="login" class="login-wrap">
-      <div class="brand" style="margin-bottom:18px"><div class="mark">F</div><div><h1>FB-SMP Control Room</h1><div class="sub">Private server administration</div></div></div>
+      <div class="brand" style="margin-bottom:18px"><div class="mark">F</div><div><h1>FB-SMP Control Room</h1><div class="sub">Server administration</div></div></div>
       <form id="login-form" class="login-box">
-        <h2 style="margin:0;font-size:17px">Sign in</h2><p class="muted">Enter the local panel access token from the plugin data folder.</p>
-        <label for="token">Admin access token</label><input id="token" type="password" autocomplete="current-password" required minlength="32">
-        <div class="error" id="login-error"></div><button class="button primary" style="width:100%;margin-top:10px">Open control room</button>
+        <h2 style="margin:0;font-size:17px">Sign in</h2><p class="muted">Use your dashboard account, or the owner token from the plugin data folder.</p>
+        <label for="username">Username (accounts)</label><input id="username" autocomplete="username" placeholder="optional">
+        <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="optional">
+        <label for="token">Owner token</label><input id="token" type="password" autocomplete="off" placeholder="paste the admin token">
+        <div class="error" id="login-error"></div><button class="button primary" style="width:100%;margin-top:12px">Open control room</button>
       </form>
-      <div class="foot">This panel accepts local connections only.</div>
+      <div class="foot">Sessions expire after 30 minutes of inactivity.</div>
     </main>
+
     <main id="app" class="shell hidden">
-      <header class="top"><div class="brand"><div class="mark">F</div><div><h1>FB-SMP Control Room</h1><div class="sub" id="version">Paper survival network</div></div></div><div class="action-row"><span class="status"><i class="dot"></i> Backend online</span><button id="logout" class="button">Sign out</button></div></header>
-      <section class="grid">
-        <div class="metric"><span>Player records</span><strong id="players">—</strong><em>Persistent profiles</em></div>
-        <div class="metric"><span>Currency in circulation</span><strong id="balance">—</strong><em>₣฿ economy total</em></div>
-        <div class="metric"><span>Transactions</span><strong id="transactions-count">—</strong><em>Recorded economy events</em></div>
-        <div class="metric"><span>Server time</span><strong id="time" style="font-size:17px">—</strong><em id="uptime">Paper backend</em></div>
-      </section>
+      <header class="top">
+        <div class="brand"><div class="mark">F</div><div><h1>FB-SMP Control Room</h1><div class="sub" id="version">Paper survival network</div></div></div>
+        <div class="action-row"><span class="status"><i class="dot"></i> <span id="who">—</span></span><button id="logout" class="button">Sign out</button></div>
+      </header>
+      <section class="grid" id="metrics"></section>
       <section class="panel">
-        <div class="panel-head"><div><h2>Server records</h2><div class="muted" style="margin-top:5px">Read-only operations data, structured logs and backup status</div></div><div class="action-row"><div class="tabs">
-          <button class="tab-button active" data-tab="players">Players</button><button class="tab-button" data-tab="transactions">Transactions</button>
-          <button class="tab-button" data-tab="loans">Loans</button><button class="tab-button" data-tab="mortgages">Mortgages</button>
-          <button class="tab-button" data-tab="auctions">Auctions</button><button class="tab-button" data-tab="orders">Orders</button>
-          <button class="tab-button" data-tab="moderation">Moderation</button><button class="tab-button" data-tab="logs">Audit log</button>
-          <button class="tab-button" data-tab="backups">Backups</button><button class="tab-button" data-tab="config">Configuration</button>
-        </div><button id="backup" class="button primary">Create backup</button></div></div>
-        <div id="table"></div>
+        <div class="panel-head"><div class="nav" id="nav"></div><div class="action-row"><button id="refresh" class="button">Refresh</button></div></div>
+        <div id="view"></div>
       </section>
-      <div class="foot">Admin HTTP service is bound to 127.0.0.1. Do not forward port 8765 to the public internet.</div>
+      <div class="foot">Loopback admin service. Expose it publicly only through a TLS reverse proxy that rewrites the Host header.</div>
     </main>
+
     <script>
-      let csrfToken = "";
-      let currentTab = "players";
+      let csrf = "", perms = new Set(), role = "", user = "", tab = "overview", timer = null;
       const $ = (id) => document.getElementById(id);
+      const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+      const money = (m) => "₣฿" + (Number(m) / 100).toFixed(2);
+      const dt = (ms) => Number(ms) > 0 ? new Date(Number(ms)).toLocaleString() : "—";
+      const can = (p) => perms.has(p);
+      const mem = {};
+      const promptOnce = (k, f) => Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : f;
+      const setPromptOnce = (k, v) => { mem[k] = v; };
+      const metric = (label, value) => '<div class="metric"><span>' + esc(label) + '</span><strong>' + esc(value) + '</strong></div>';
+      const field = (id, label, placeholder) => '<div class="field"><label>' + esc(label) + '</label><input id="' + id + '" placeholder="' + esc(placeholder) + '"></div>';
+
       async function api(path, options = {}) {
         const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-        if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
-        const response = await fetch(path, { credentials: "same-origin", ...options, headers });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error || "Request failed");
+        if (csrf) headers["X-CSRF-Token"] = csrf;
+        const res = await fetch(path, { credentials: "same-origin", ...options, headers });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || "Request failed");
         return body;
       }
-      function showApp() { $("login").classList.add("hidden"); $("app").classList.remove("hidden"); refresh(); }
-      async function restoreSession() {
-        try { const session = await api("/api/session"); csrfToken = session.csrfToken; showApp(); }
+      const post = (path, payload) => api(path, { method: "POST", body: JSON.stringify(payload || {}) });
+
+      function table(columns, rows) {
+        if (!rows || !rows.length) return '<div class="empty">No records found.</div>';
+        return '<table><thead><tr>' + columns.map(c => '<th>' + esc(c[0]) + '</th>').join("") +
+          '</tr></thead><tbody>' + rows.map(r => '<tr>' + columns.map(c => '<td>' + c[2](r) + '</td>').join("") + '</tr>').join("") + '</tbody></table>';
+      }
+
+      const TABS = [
+        ["overview","Overview","status.view"], ["players","Players","players.view"], ["economy","Economy","economy.view"],
+        ["moderation","Moderation","players.view"], ["shop","Shop","shop.view"], ["worlds","Worlds","worlds.manage"],
+        ["console","Console","console.send"], ["announce","Announce","announce.manage"], ["schedule","Scheduled","schedule.manage"],
+        ["backups","Backups","backups.manage"], ["config","Config","settings.manage"], ["admins","Admins","admins.manage"], ["audit","Audit","logs.view"]
+      ];
+
+      function buildNav() {
+        $("nav").innerHTML = TABS.filter(t => can(t[2])).map(t =>
+          '<button data-tab="' + t[0] + '" class="' + (t[0] === tab ? "active" : "") + '">' + t[1] + '</button>').join("");
+        $("nav").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.tab; buildNav(); render(); }));
+      }
+      function showApp() { $("login").classList.add("hidden"); $("app").classList.remove("hidden"); buildNav(); refreshAll(); if (timer) clearInterval(timer); timer = setInterval(refreshAll, 20000); }
+      async function restore() {
+        try { const s = await api("/api/session"); csrf = s.csrfToken; perms = new Set(s.permissions || []); role = s.role; user = s.username; $("who").textContent = s.username + " · " + s.role.toLowerCase(); showApp(); }
         catch { $("login").classList.remove("hidden"); $("app").classList.add("hidden"); }
       }
-      $("login-form").addEventListener("submit", async (event) => {
-        event.preventDefault(); $("login-error").textContent = "";
-        try { const result = await api("/api/login", { method:"POST", body:JSON.stringify({token:$("token").value}) }); csrfToken=result.csrfToken; $("token").value=""; showApp(); }
-        catch (error) { $("login-error").textContent=error.message; }
+
+      $("login-form").addEventListener("submit", async (e) => {
+        e.preventDefault(); $("login-error").textContent = "";
+        const payload = { token: $("token").value, username: $("username").value, password: $("password").value };
+        try {
+          const r = await api("/api/login", { method: "POST", body: JSON.stringify(payload) });
+          csrf = r.csrfToken; perms = new Set(r.permissions || []); role = r.role; user = r.username;
+          $("who").textContent = r.username + " · " + r.role.toLowerCase(); $("token").value = ""; $("password").value = ""; showApp();
+        } catch (err) { $("login-error").textContent = err.message; }
       });
-      $("logout").addEventListener("click", async () => { try { await api("/api/logout",{method:"POST",body:"{}"}); } finally { csrfToken=""; location.reload(); } });
-      $("backup").addEventListener("click", async () => { try { const result=await api("/api/backup",{method:"POST",body:"{}"}); alert(result.message); } catch(error) { alert(error.message); } });
-      document.querySelectorAll(".tab-button").forEach(button=>button.addEventListener("click",()=>selectTab(button.dataset.tab)));
-      function selectTab(tab) { currentTab=tab; document.querySelectorAll(".tab-button").forEach(button=>button.classList.toggle("active",button.dataset.tab===tab)); loadTable(); }
-      async function refresh() {
+      $("logout").addEventListener("click", async () => { try { await post("/api/logout"); } finally { csrf = ""; perms = new Set(); location.reload(); } });
+      $("refresh").addEventListener("click", refreshAll);
+
+      async function refreshAll() {
         try {
-          const data=await api("/api/status");
-          $("version").textContent="Paper "+data.version;
-          $("players").textContent=Number(data.playerRecords).toLocaleString();
-          $("balance").textContent=data.totalBalance;
-          $("transactions-count").textContent=Number(data.transactionCount).toLocaleString();
-          $("time").textContent=new Date(data.serverTime).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
-          const uptimeSeconds=Number(data.uptimeSeconds)||0;
-          const uptimeHours=Math.floor(uptimeSeconds/3600);
-          const uptimeMinutes=Math.floor((uptimeSeconds%3600)/60);
-          $("uptime").textContent=`${data.onlinePlayers}/${data.maximumPlayers} online · uptime ${uptimeHours}h ${uptimeMinutes}m · ${Math.round(Number(data.heapUsedBytes)/1048576)} MB heap`;
-          await loadTable();
-        } catch(error) { if(error.message==="Sign in to continue.") restoreSession(); }
+          const s = await api("/api/status");
+          $("version").textContent = "Paper " + s.version + " · MC " + s.minecraft;
+          const heap = Math.round(Number(s.heapUsedBytes) / 1048576), heapMax = Math.round(Number(s.heapMaxBytes) / 1048576);
+          const diskPct = Number(s.diskTotalBytes) > 0 ? Math.round((1 - Number(s.diskUsableBytes) / Number(s.diskTotalBytes)) * 100) : 0;
+          const tps = Number(s.tps), mspt = Number(s.mspt);
+          $("metrics").innerHTML = [
+            ["Players online", s.onlinePlayers + " / " + s.maximumPlayers, "Maintenance " + (s.maintenance ? "on" : "off")],
+            ["TPS", tps >= 0 ? tps.toFixed(1) : "n/a", "MSPT " + (mspt >= 0 ? mspt.toFixed(1) : "n/a")],
+            ["Records", Number(s.playerRecords).toLocaleString(), "Currency " + s.totalBalance],
+            ["Heap", heap + " MB", "of " + heapMax + " MB · disk " + diskPct + "%"]
+          ].map(m => '<div class="metric"><span>' + m[0] + '</span><strong>' + esc(m[1]) + '</strong><em>' + esc(m[2]) + '</em></div>').join("");
+          render();
+        } catch (err) { if (err.message === "Sign in to continue.") restore(); }
       }
-      async function loadTable() {
-        const root=$("table"); root.innerHTML='<div class="empty">Loading records…</div>';
-        try {
-          if(currentTab==="players") {
-            const rows=await api("/api/players");
-            root.innerHTML=rows.length?'<table><thead><tr><th>Player</th><th>Balance</th></tr></thead><tbody>'+rows.map(row=>'<tr><td>'+escapeHtml(row.name)+'</td><td class="positive">'+escapeHtml(row.formattedBalance)+'</td></tr>').join("")+'</tbody></table>':'<div class="empty">No player records yet.</div>';
-          } else {
-            const tables={
-              transactions:{path:"/api/transactions",columns:[["Type","type"],["Sender","senderUuid"],["Recipient","receiverUuid"],["Amount","amountMinor"],["Time","createdAt"]]},
-              loans:{path:"/api/loans",columns:[["ID","id"],["Player","playerName"],["Remaining","remainingMinor"],["Due","dueAt"],["Status","status"]]},
-              mortgages:{path:"/api/mortgages",columns:[["ID","id"],["Player","playerName"],["Asset","assetKey"],["Remaining","remainingMinor"],["Installments","installmentsLeft"],["Next due","nextDueAt"],["Status","status"]]},
-              auctions:{path:"/api/auctions",columns:[["ID","id"],["Seller","sellerName"],["Quantity","quantity"],["Price","priceMinor"],["Status","status"],["Expires","expiresAt"]]},
-              orders:{path:"/api/orders",columns:[["ID","id"],["Requester","requester"],["Claimer","claimer"],["Item","itemKey"],["Quantity","quantity"],["Reward","rewardMinor"],["Status","status"],["Expires","expiresAt"]]},
-              moderation:{path:"/api/moderation",columns:[["Player UUID","player"],["Action","action"],["Reason","reason"],["Expires","expiresAt"],["Created","createdAt"]]},
-              logs:{path:"/api/logs",columns:[["Type","type"],["Detail","detail"],["Time","createdAt"]]},
-              backups:{path:"/api/backups",columns:[["Backup file","name"],["Size","sizeBytes"],["Modified","modifiedAt"]]}
-            };
-            if(currentTab==="config") {
-              const settings=await api("/api/config");
-              root.innerHTML='<table><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>'+Object.entries(settings).map(([key,value])=>'<tr><td>'+escapeHtml(key)+'</td><td>'+escapeHtml(value)+'</td></tr>').join("")+'</tbody></table>';
-            } else {
-              const definition=tables[currentTab];
-              const rows=await api(definition.path);
-              root.innerHTML=rows.length?'<table><thead><tr>'+definition.columns.map(column=>'<th>'+escapeHtml(column[0])+'</th>').join("")+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+definition.columns.map(column=>'<td>'+renderValue(column[1],row[column[1]])+'</td>').join("")+'</tr>').join("")+'</tbody></table>':'<div class="empty">No records found.</div>';
-            }
-          }
-        } catch(error) { root.innerHTML='<div class="empty">'+escapeHtml(error.message)+'</div>'; }
+
+      function render() {
+        const v = $("view");
+        const builders = { overview: viewOverview, players: viewPlayers, economy: viewEconomy, moderation: viewModeration, shop: viewShop, worlds: viewWorlds, console: viewConsole, announce: viewAnnounce, schedule: viewSchedule, backups: viewBackups, config: viewConfig, admins: viewAdmins, audit: viewAudit };
+        v.innerHTML = '<div class="empty">Loading…</div>';
+        (builders[tab] || (() => { v.innerHTML = '<div class="empty">Nothing here.</div>'; }))().catch(err => { v.innerHTML = '<div class="empty">' + esc(err.message) + '</div>'; });
       }
-      function renderValue(key,value) {
-        if(value===null||value===undefined||value==="") return '<span class="muted">—</span>';
-        if(key==="amountMinor"||key==="remainingMinor"||key==="priceMinor"||key==="rewardMinor") return '<span class="positive">₣฿'+(Number(value)/100).toFixed(2)+'</span>';
-        if(key==="sizeBytes") return escapeHtml((Number(value)/1048576).toFixed(2)+" MB");
-        if(key==="createdAt"||key==="expiresAt"||key==="dueAt"||key==="nextDueAt"||key==="modifiedAt") return escapeHtml(Number(value)>0?new Date(Number(value)).toLocaleString():"Permanent");
-        return escapeHtml(value);
+
+      async function viewOverview() {
+        const d = await api("/api/overview");
+        let html = '<div class="card"><h2 style="margin:0 0 10px">Online now</h2>' +
+          table([["Player",0,r=>esc(r.name)],["Edition",0,r=>'<span class="chip">'+esc(r.edition)+'</span>'],["World",0,r=>esc(r.world)],["UUID",0,r=>'<span class="muted">'+esc(r.uuid)+'</span>']], d.online) + '</div>';
+        html += '<div class="card"><h2 style="margin:0 0 10px">Recent audit</h2>' +
+          table([["Actor",0,r=>esc(r.actorName)],["Action",0,r=>esc(r.action)],["Target",0,r=>esc(r.target)],["When",0,r=>esc(dt(r.createdAt))]], d.recentAudit) + '</div>';
+        $("view").innerHTML = html;
       }
-      function escapeHtml(value) { return String(value).replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character])); }
-      restoreSession();
-      setInterval(refresh, 30000);
+
+      async function viewPlayers() {
+        const q = promptOnce("players-q", "") || "";
+        const rows = await api("/api/players?q=" + encodeURIComponent(q));
+        let html = '<div class="form-grid"><div class="field"><label>Search</label><input id="pq" value="' + esc(q) + '" placeholder="name or UUID"></div>' +
+          '<div class="field"><button class="button" id="psearch">Search</button></div></div>';
+        html += table([["Player",0,r=>esc(r.name)],["Edition",0,r=>'<span class="chip">'+esc(r.edition)+'</span>'],["Balance",0,r=>'<span class="positive">'+money(r.balanceMinor)+'</span>'],["Status",0,r=>r.online?'<span class="chip good">online</span>':'<span class="chip">offline</span>'],["Last seen",0,r=>esc(dt(r.lastSeenAt))]], rows);
+        if (can("players.manage")) {
+          html += '<div class="card"><h2 style="margin:0 0 10px">Player actions</h2><div class="form-grid">' +
+            field("pa-name","Player name","") + field("pa-reason","Reason","") +
+            '<div class="field"><label>Action</label><select id="pa-action"><option>KICK</option><option>BAN</option><option>MUTE</option><option>UNBAN</option><option>UNMUTE</option><option>GAMEMODE</option><option>RESET</option></select></div>' +
+            field("pa-value","Value (game mode / RESET confirm)","") +
+            '<div class="field"><button class="button primary" id="pa-run">Apply</button></div></div><div class="muted" id="pa-msg"></div></div>';
+        }
+        $("view").innerHTML = html;
+        $("psearch").addEventListener("click", () => { setPromptOnce("players-q", $("pq").value); render(); });
+        if ($("pa-run")) $("pa-run").addEventListener("click", async () => {
+          try { const r = await post("/api/player", { player: $("pa-name").value, action: $("pa-action").value, reason: $("pa-reason").value, value: $("pa-value").value, confirm: $("pa-value").value }); $("pa-msg").textContent = r.message; }
+          catch (e) { $("pa-msg").textContent = e.message; }
+        });
+      }
+
+      async function viewEconomy() {
+        const d = await api("/api/economy");
+        let html = '<div class="grid" style="margin-bottom:14px">' +
+          metric("In circulation", d.inCirculation) + metric("Earned (grants)", d.earned) + metric("Spent (sinks)", d.spent) + metric("Auction volume", d.auctionVolume) + '</div>';
+        html += '<div class="card"><h2 style="margin:0 0 10px">Richest players</h2>' + table([["Player",0,r=>esc(r.name)],["Balance",0,r=>'<span class="positive">'+money(r.balanceMinor)+'</span>']], d.richest) + '</div>';
+        html += '<div class="card"><h2 style="margin:0 0 10px">Recent transactions</h2>' + table([["Type",0,r=>esc(r.type)],["Amount",0,r=>money(r.amountMinor)],["When",0,r=>esc(dt(r.createdAt))]], d.transactions) + '</div>';
+        if (can("economy.manage")) {
+          html += '<div class="card"><h2 style="margin:0 0 10px">Adjust balance</h2><div class="form-grid">' +
+            field("eco-player","Player","") + '<div class="field"><label>Action</label><select id="eco-action"><option>GIVE</option><option>TAKE</option><option>SET</option></select></div>' +
+            field("eco-amount","Amount (e.g. 250.00)","") + '<div class="field"><button class="button primary" id="eco-run">Apply</button></div></div><div class="muted" id="eco-msg"></div></div>';
+        }
+        $("view").innerHTML = html;
+        if ($("eco-run")) $("eco-run").addEventListener("click", async () => {
+          try { const r = await post("/api/economy", { player: $("eco-player").value, action: $("eco-action").value, amount: $("eco-amount").value }); $("eco-msg").textContent = r.message + " " + (r.balance || ""); }
+          catch (e) { $("eco-msg").textContent = e.message; }
+        });
+      }
+
+      async function viewModeration() {
+        const rows = await api("/api/moderation");
+        $("view").innerHTML = '<div class="card"><h2 style="margin:0 0 10px">Recent moderation records</h2>' +
+          table([["Player",0,r=>'<span class="muted">'+esc(r.player)+'</span>'],["Action",0,r=>'<span class="chip">'+esc(r.action)+'</span>'],["Reason",0,r=>esc(r.reason)],["Expires",0,r=>r.expiresAt?esc(dt(r.expiresAt)):'<span class="chip bad">permanent</span>'],["When",0,r=>esc(dt(r.createdAt))]], rows) + '</div>';
+      }
+
+      async function viewShop() {
+        const q = promptOnce("shop-q", "") || "";
+        const rows = await api("/api/prices?q=" + encodeURIComponent(q));
+        let html = '<div class="form-grid"><div class="field"><label>Search item</label><input id="sq" value="' + esc(q) + '"></div><div class="field"><button class="button" id="ssearch">Search</button></div></div>';
+        html += table([["Item",0,r=>esc(r.itemId)],["Buy",0,r=>r.buyMinor?money(r.buyMinor):'—'],["Sell",0,r=>r.sellMinor?money(r.sellMinor):'—'],["Category",0,r=>esc(r.category)],["State",0,r=>r.disabled?'<span class="chip bad">disabled</span>':'<span class="chip good">active</span>']], rows);
+        if (can("shop.manage")) {
+          html += '<div class="card"><h2 style="margin:0 0 10px">Edit price</h2><div class="form-grid">' +
+            field("sp-item","Item id","stone") + '<div class="field"><label>Action</label><select id="sp-action"><option>SET_BUY</option><option>SET_SELL</option><option>DISABLE</option><option>ENABLE</option><option>UNDO</option></select></div>' +
+            field("sp-value","Value","1.00") + '<div class="field"><button class="button primary" id="sp-run">Apply</button></div></div><div class="muted" id="sp-msg"></div></div>';
+        }
+        $("view").innerHTML = html;
+        $("ssearch").addEventListener("click", () => { setPromptOnce("shop-q", $("sq").value); render(); });
+        if ($("sp-run")) $("sp-run").addEventListener("click", async () => {
+          try { const r = await post("/api/price", { item: $("sp-item").value, action: $("sp-action").value, value: $("sp-value").value }); $("sp-msg").textContent = r.message; }
+          catch (e) { $("sp-msg").textContent = e.message; }
+        });
+      }
+
+      async function viewWorlds() {
+        const rows = await api("/api/worlds");
+        let html = table([["World",0,r=>esc(r.name)],["Env",0,r=>esc(r.environment)],["Players",0,r=>r.players],["Difficulty",0,r=>esc(r.difficulty)],["PVP",0,r=>r.pvp?"on":"off"],["Size",0,r=>r.sizeBytes>=0?(r.sizeBytes/1048576).toFixed(1)+" MB":"—"]], rows);
+        html += '<div class="card"><h2 style="margin:0 0 10px">World action</h2><div class="form-grid">' +
+          field("w-name","World","world") + '<div class="field"><label>Action</label><select id="w-action"><option>SAVE</option><option>DIFFICULTY</option><option>PVP</option><option>TIME</option><option>WEATHER</option></select></div>' +
+          field("w-value","Value","") + '<div class="field"><button class="button primary" id="w-run">Apply</button></div></div><div class="muted" id="w-msg"></div></div>';
+        $("view").innerHTML = html;
+        $("w-run").addEventListener("click", async () => {
+          try { const r = await post("/api/world", { world: $("w-name").value, action: $("w-action").value, value: $("w-value").value }); $("w-msg").textContent = r.message; }
+          catch (e) { $("w-msg").textContent = e.message; }
+        });
+      }
+
+      async function viewConsole() {
+        const d = await api("/api/console");
+        let html = '<div class="card"><h2 style="margin:0 0 10px">Server log (last ' + d.lines.length + ' lines)</h2><div class="log" id="logbox">' + esc(d.lines.join("\n")) + '</div></div>';
+        if (can("console.send")) {
+          html += '<div class="card"><h2 style="margin:0 0 10px">Run command</h2><div class="form-grid">' + field("c-cmd","Command (without /)","say Hello") + '<div class="field"><button class="button primary" id="c-run">Send</button></div></div><div class="muted" id="c-msg"></div></div>';
+          html += '<div class="card"><h2 style="margin:0 0 10px">Server control</h2><div class="action-row"><button class="button" id="sv-save">Save all</button><button class="button" id="sv-reload">Reload server</button><button class="button danger" id="sv-stop">Restart (graceful)</button></div><div class="muted" id="sv-msg" style="margin-top:8px"></div></div>';
+        }
+        $("view").innerHTML = html;
+        const box = $("logbox"); if (box) box.scrollTop = box.scrollHeight;
+        if ($("c-run")) $("c-run").addEventListener("click", async () => {
+          try { const r = await post("/api/console", { command: $("c-cmd").value }); $("c-msg").textContent = r.message; }
+          catch (e) { $("c-msg").textContent = e.message; }
+        });
+        const ctl = async (action) => { try { const r = await post("/api/server", { action }); $("sv-msg").textContent = r.message; } catch (e) { $("sv-msg").textContent = e.message; } };
+        if ($("sv-save")) $("sv-save").addEventListener("click", () => ctl("SAVE"));
+        if ($("sv-reload")) $("sv-reload").addEventListener("click", () => { if (confirm("Reload the server now?")) ctl("RELOAD"); });
+        if ($("sv-stop")) $("sv-stop").addEventListener("click", () => { if (confirm("Restart the server gracefully? Players will be disconnected briefly.")) ctl("STOP"); });
+      }
+
+      async function viewAnnounce() {
+        let html = '<div class="card"><h2 style="margin:0 0 10px">Queue announcement (delivered next tick)</h2><div class="form-grid">' +
+          field("an-msg","Message","Server restart in 5 minutes") + '<div class="field"><button class="button primary" id="an-run">Queue</button></div></div><div class="muted" id="an-out"></div></div>';
+        html += '<div class="card"><h2 style="margin:0 0 10px">Broadcast to chat now</h2><div class="form-grid">' + field("an-chat","Chat message","Welcome to FB-SMP") + '<div class="field"><button class="button" id="an-chat-run">Broadcast</button></div></div><div class="muted" id="an-chat-out"></div></div>';
+        $("view").innerHTML = html;
+        $("an-run").addEventListener("click", async () => { try { const r = await post("/api/announce", { message: $("an-msg").value }); $("an-out").textContent = r.message; } catch (e) { $("an-out").textContent = e.message; } });
+        $("an-chat-run").addEventListener("click", async () => { try { const r = await post("/api/server", { action: "BROADCAST", message: $("an-chat").value }); $("an-chat-out").textContent = r.message; } catch (e) { $("an-chat-out").textContent = e.message; } });
+      }
+
+      async function viewSchedule() {
+        const rows = await api("/api/tasks");
+        let html = table([["ID",0,r=>r.id],["Kind",0,r=>'<span class="chip">'+esc(r.kind)+'</span>'],["Payload",0,r=>esc(r.payload)],["Every (min)",0,r=>r.intervalMinutes],["Next",0,r=>esc(dt(r.nextRunAt))],["Runs",0,r=>r.runCount],["State",0,r=>r.enabled?'<span class="chip good">on</span>':'<span class="chip bad">off</span>']], rows);
+        html += '<div class="card"><h2 style="margin:0 0 10px">Create scheduled task</h2><div class="form-grid">' +
+          '<div class="field"><label>Kind</label><select id="t-kind"><option>ANNOUNCE</option><option>COMMAND</option></select></div>' +
+          field("t-payload","Payload (message or command)","") + field("t-interval","Interval minutes","60") +
+          '<div class="field"><button class="button primary" id="t-run">Create</button></div></div>';
+        html += '<div class="form-grid"><div class="field"><label>Task id</label><input id="t-id"></div><div class="field"><button class="button" id="t-on">Enable</button></div><div class="field"><button class="button" id="t-off">Disable</button></div><div class="field"><button class="button danger" id="t-del">Delete</button></div></div><div class="muted" id="t-msg"></div></div>';
+        $("view").innerHTML = html;
+        const run = async (body) => { try { const r = await post("/api/tasks", body); $("t-msg").textContent = r.message; render(); } catch (e) { $("t-msg").textContent = e.message; } };
+        $("t-run").addEventListener("click", () => run({ action: "CREATE", kind: $("t-kind").value, payload: $("t-payload").value, intervalMinutes: $("t-interval").value }));
+        $("t-on").addEventListener("click", () => run({ action: "TOGGLE", id: $("t-id").value, value: "true" }));
+        $("t-off").addEventListener("click", () => run({ action: "TOGGLE", id: $("t-id").value, value: "false" }));
+        $("t-del").addEventListener("click", () => { if (confirm("Delete this task?")) run({ action: "DELETE", id: $("t-id").value }); });
+      }
+
+      async function viewBackups() {
+        const rows = await api("/api/backups");
+        let html = '<div class="action-row" style="margin-bottom:12px"><button class="button primary" id="bk-run">Create backup</button><span class="muted" id="bk-msg"></span></div>';
+        html += table([["Backup",0,r=>esc(r.name)],["Size",0,r=>r.sizeBytes?(r.sizeBytes/1048576).toFixed(2)+" MB":"—"],["Created",0,r=>esc(dt(r.modifiedAt))]], rows);
+        $("view").innerHTML = html;
+        $("bk-run").addEventListener("click", async () => { try { const r = await post("/api/backup"); $("bk-msg").textContent = r.message; } catch (e) { $("bk-msg").textContent = e.message; } });
+      }
+
+      async function viewConfig() {
+        const d = await api("/api/config");
+        let html = '<div class="card"><h2 style="margin:0 0 10px">Read-only settings</h2>' +
+          table([["Setting",0,r=>esc(r[0])],["Value",0,r=>esc(r[1])]], Object.entries(d).map(([k,v])=>[k,v])) + '</div>';
+        html += '<div class="card"><h2 style="margin:0 0 10px">Dashboard settings</h2><div class="form-grid">' +
+          '<div class="field"><label>Setting</label><select id="cf-key"><option>timezone</option><option>maintenance</option><option>maintenance-message</option></select></div>' +
+          field("cf-val","Value","Asia/Kolkata") + '<div class="field"><button class="button primary" id="cf-run">Save</button></div></div><div class="muted" id="cf-msg"></div></div>';
+        $("view").innerHTML = html;
+        $("cf-run").addEventListener("click", async () => { try { const r = await post("/api/settings", { key: $("cf-key").value, value: $("cf-val").value }); $("cf-msg").textContent = r.message; } catch (e) { $("cf-msg").textContent = e.message; } });
+      }
+
+      async function viewAdmins() {
+        const rows = await api("/api/admins");
+        let html = table([["Username",0,r=>esc(r.username)],["Role",0,r=>'<span class="chip">'+esc(r.role)+'</span>'],["Last login",0,r=>esc(dt(r.lastLoginAt))],["Created",0,r=>esc(dt(r.createdAt))]], rows);
+        html += '<div class="card"><h2 style="margin:0 0 10px">Create account</h2><div class="form-grid">' +
+          field("ad-user","Username","") + field("ad-pass","Password (10+ chars)","") +
+          '<div class="field"><label>Role</label><select id="ad-role"><option>VIEWER</option><option>MODERATOR</option><option>ADMINISTRATOR</option><option>OWNER</option></select></div>' +
+          '<div class="field"><button class="button primary" id="ad-run">Create</button></div></div>';
+        html += '<div class="form-grid"><div class="field"><label>Account id</label><input id="ad-id"></div>' +
+          '<div class="field"><label>Role</label><select id="ad-role2"><option>VIEWER</option><option>MODERATOR</option><option>ADMINISTRATOR</option><option>OWNER</option></select></div>' +
+          field("ad-newpass","New password (optional)","") +
+          '<div class="field"><button class="button" id="ad-role-run">Set role</button></div><div class="field"><button class="button" id="ad-pass-run">Set password</button></div><div class="field"><button class="button danger" id="ad-del">Delete</button></div></div><div class="muted" id="ad-msg"></div></div>';
+        $("view").innerHTML = html;
+        const run = async (body) => { try { const r = await post("/api/admins", body); $("ad-msg").textContent = r.message; render(); } catch (e) { $("ad-msg").textContent = e.message; } };
+        $("ad-run").addEventListener("click", () => run({ action: "CREATE", username: $("ad-user").value, password: $("ad-pass").value, role: $("ad-role").value }));
+        $("ad-role-run").addEventListener("click", () => run({ action: "ROLE", id: $("ad-id").value, role: $("ad-role2").value }));
+        $("ad-pass-run").addEventListener("click", () => run({ action: "PASSWORD", id: $("ad-id").value, role: $("ad-role2").value, password: $("ad-newpass").value }));
+        $("ad-del").addEventListener("click", () => { if (confirm("Delete this account?")) run({ action: "DELETE", id: $("ad-id").value }); });
+      }
+
+      async function viewAudit() {
+        const [audit, logs] = await Promise.all([api("/api/audit"), api("/api/logs")]);
+        let html = '<div class="card"><h2 style="margin:0 0 10px">Admin audit trail</h2>' +
+          table([["Actor",0,r=>esc(r.actorName)],["Action",0,r=>esc(r.action)],["Target",0,r=>esc(r.target)],["Reason",0,r=>esc(r.reason)],["When",0,r=>esc(dt(r.createdAt))]], audit) + '</div>';
+        html += '<div class="card"><h2 style="margin:0 0 10px">Economy &amp; moderation events</h2>' +
+          table([["Type",0,r=>esc(r.type)],["Detail",0,r=>esc(r.detail)],["When",0,r=>esc(dt(r.createdAt))]], logs) + '</div>';
+        $("view").innerHTML = html;
+      }
+
+      restore();
     </script>
   </body>
 </html>
