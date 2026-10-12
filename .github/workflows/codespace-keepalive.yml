@@ -1,0 +1,70 @@
+name: Codespace keep-alive
+
+# Keeps the FB-SMP Codespace host awake and serving the playit tunnels while the
+# assistant's sandbox is idle or offline. Codespaces stop after ~30 minutes of
+# inactivity, so this runs every 15 minutes: it starts the codespace if needed,
+# pokes it with an SSH command (activity resets the idle timer), relaunches the
+# keeper daemon if it died, and restarts playit if a public tunnel stops
+# answering.
+#
+# Requires a repository secret CODESPACE_KEEPALIVE_TOKEN: a token with the
+# `codespace` scope (classic PAT) or a fine-grained token with Codespaces: Read
+# and write. The default GITHUB_TOKEN does NOT have codespace access.
+# Optional: set FBSMP_CODESPACE to override the codespace name.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: codespace-keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.CODESPACE_KEEPALIVE_TOKEN }}
+      CS: ${{ vars.FBSMP_CODESPACE || 'fb-smp-24h-4qv59g697vjwcgjx' }}
+      JAVA_ADDR: cairo-paste.tun.ply.gg:25565
+      BEDROCK_ADDR: fried-toilette.tun.ply.gg:37298
+    steps:
+      - name: Skip when no codespace token is configured
+        if: ${{ env.GH_TOKEN == '' }}
+        run: echo "CODESPACE_KEEPALIVE_TOKEN not set; skipping."
+
+      - name: Install gh
+        if: ${{ env.GH_TOKEN != '' }}
+        run: |
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y gh >/dev/null
+
+      - name: Start codespace if stopped
+        if: ${{ env.GH_TOKEN != '' }}
+        run: |
+          state="$(gh codespace list --json name,state -q ".[] | select(.name==\"$CS\") | .state" || true)"
+          echo "state=$state"
+          if [ -z "$state" ]; then echo "codespace '$CS' not found"; exit 0; fi
+          if [ "$state" != "Available" ]; then
+            gh codespace start -c "$CS" || true
+          fi
+
+      - name: Poke codespace (resets idle timer) and ensure keeper
+        if: ${{ env.GH_TOKEN != '' }}
+        run: |
+          gh codespace ssh -c "$CS" -- 'echo alive' || true
+          if ! gh codespace ssh -c "$CS" -- 'pgrep -f fbsmp-keeper.sh >/dev/null'; then
+            gh codespace ssh -c "$CS" -- 'setsid nohup /workspaces/fbsmp-keeper.sh >>/workspaces/keeper.log 2>&1 </dev/null & sleep 4; pgrep -cf fbsmp-keeper.sh' || true
+          fi
+
+      - name: Restart playit if a tunnel is down
+        if: ${{ env.GH_TOKEN != '' }}
+        run: |
+          ok() { curl -s --max-time 15 "https://api.mcstatus.io/v2/status/$1/$2" | grep -q '"online":true'; }
+          if ok java "$JAVA_ADDR" && ok bedrock "$BEDROCK_ADDR"; then
+            echo "both tunnels online"
+          else
+            echo "a tunnel is down; restarting playit in the codespace"
+            gh codespace ssh -c "$CS" -- "pkill -f 'playit --socket' 2>/dev/null; sleep 2; cd /workspaces/playit-agent && setsid nohup ./playit --socket-path ./playit.sock --secret-path ./playit.toml >>daemon.log 2>&1 </dev/null &" || true
+          fi
