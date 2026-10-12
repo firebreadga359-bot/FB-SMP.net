@@ -283,8 +283,10 @@ PAPER_XMS=$PAPER_XMS
 PAPER_XMX=$PAPER_XMX
 VELOCITY_XMS=$VELOCITY_XMS
 VELOCITY_XMX=$VELOCITY_XMX
-# Admin panel bridge: loopback panel (8765) published on the public port.
-PANEL_BRIDGE_LISTEN=0.0.0.0
+# Admin panel bridge: loopback panel (8765) reached over an SSH tunnel.
+# Bind loopback-only so the panel is never exposed to the public internet;
+# remote operators forward the port, e.g. ssh -L 12000:127.0.0.1:12000 user@vps
+PANEL_BRIDGE_LISTEN=127.0.0.1
 PANEL_BRIDGE_PORT=12000
 PANEL_BRIDGE_TARGET_HOST=127.0.0.1
 PANEL_BRIDGE_TARGET_PORT=8765
