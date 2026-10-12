@@ -21,6 +21,34 @@ PANEL_HOST_HEADER = "%s:%d" % (PANEL_HOST, PANEL_PORT)
 ALLOWED_PREFIXES = ("/api/",)
 ALLOWED_EXACT = ("/", "/index.html", "/favicon.ico", "/health")
 
+# Progressive Web App assets served by the bridge itself (no game-server rebuild
+# needed). The panel HTML is fetched from the plugin and patched in flight with
+# the manifest / install / service-worker tags.
+PANEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "panel")
+STATIC_FILES = {
+    "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json; charset=utf-8"),
+    "/sw.js": ("sw.js", "text/javascript; charset=utf-8"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+    "/icon-180.png": ("icon-180.png", "image/png"),
+    "/apple-touch-icon.png": ("icon-180.png", "image/png"),
+    "/favicon.ico": ("icon-192.png", "image/png"),
+}
+PWA_HEAD = (
+    '<link rel="manifest" href="/manifest.webmanifest">'
+    '<meta name="theme-color" content="#0c1118">'
+    '<meta name="application-name" content="FB-SMP Control Room">'
+    '<meta name="mobile-web-app-capable" content="yes">'
+    '<meta name="apple-mobile-web-app-capable" content="yes">'
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+    '<meta name="apple-mobile-web-app-title" content="FB-SMP">'
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+    '<link rel="icon" type="image/png" href="/icon-192.png">'
+    '<script>if("serviceWorker" in navigator){'
+    'window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){})})}'
+    '</script>'
+)
+
 HOP_BY_HOP = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
     "te", "trailers", "transfer-encoding", "upgrade",
@@ -47,9 +75,61 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _serve_static(self, spec):
+        filename, content_type = spec
+        try:
+            with open(os.path.join(PANEL_DIR, filename), "rb") as handle:
+                payload = handle.read()
+        except OSError:
+            self._reject(404, "Not found.")
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Cache-Control", "public, max-age=3600")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(payload)
+
+    def _panelled_index(self, path):
+        """Fetch the panel HTML and inject the PWA tags into its <head>."""
+        headers = {"Host": PANEL_HOST_HEADER, "X-Forwarded-Proto": "https",
+                   "X-Forwarded-For": self.client_address[0]}
+        connection = http.client.HTTPConnection(PANEL_HOST, PANEL_PORT, timeout=30)
+        try:
+            connection.request("GET", path, headers=headers)
+            response = connection.getresponse()
+            payload = response.read()
+        except Exception:
+            self._reject(502, "The admin panel is unavailable.")
+            return
+        finally:
+            connection.close()
+        if response.status == 200:
+            text = payload.decode("utf-8", "replace")
+            if "</head>" in text and "manifest.webmanifest" not in text:
+                text = text.replace("</head>", PWA_HEAD + "</head>", 1)
+            payload = text.encode("utf-8")
+        self.send_response(response.status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(payload)
+
     def _forward(self):
         path = self.path
-        if not _allowed(path.split("?", 1)[0]):
+        bare = path.split("?", 1)[0]
+        if bare in STATIC_FILES:
+            self._serve_static(STATIC_FILES[bare])
+            return
+        if bare in ("/", "/index.html"):
+            self._panelled_index(path)
+            return
+        if not _allowed(bare):
             self._reject(404, "Not found.")
             return
         length = int(self.headers.get("Content-Length") or 0)

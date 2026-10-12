@@ -87,3 +87,4 @@ _staging/
 
 # Uptime alert webhook URL (secret)
 .fbsmp-alert-webhook
+__pycache__/
