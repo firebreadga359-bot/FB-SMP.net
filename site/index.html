@@ -3,8 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FB-SMP — a survival multiplayer world, Java &amp; Bedrock</title>
-<meta name="description" content="FB-SMP is a survival multiplayer Minecraft world open to Java and Bedrock players. Join the community, trade in the player economy, build something that lasts.">
+<title>FB-SMP — survival multiplayer, Java &amp; Bedrock, always on</title>
+<meta name="description" content="FB-SMP is a 24/7 survival multiplayer Minecraft world for Java and Bedrock players. Live status, join addresses, and how to get in.">
+<meta name="theme-color" content="#0b0f0c">
+<meta property="og:title" content="FB-SMP — a survival world that stays online">
+<meta property="og:description" content="Live status, join addresses, and how to get into the FB-SMP survival server.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%237bd44a'/></svg>">
 <style>
   :root{
     --bg:#0b0f0c;
@@ -16,6 +21,7 @@
     --accent:#7bd44a;
     --accent-2:#3fa34d;
     --gold:#e6c34a;
+    --danger:#e0655a;
     --radius:16px;
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
@@ -31,7 +37,7 @@
     background:
       radial-gradient(900px 500px at 15% -10%, rgba(123,212,74,.16), transparent 60%),
       radial-gradient(700px 420px at 95% 0%, rgba(63,163,77,.12), transparent 55%),
-      linear-gradient(180deg,#0b0f0c, #0b0f0c);
+      linear-gradient(180deg,#0b0f0c,#0b0f0c);
   }
   .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 22px}
   a{color:var(--accent);text-decoration:none}
@@ -40,24 +46,25 @@
   header.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
     background:rgba(11,15,12,.72);border-bottom:1px solid var(--line)}
   .nav-inner{display:flex;align-items:center;justify-content:space-between;
-    max-width:1080px;margin:0 auto;padding:12px 22px}
+    max-width:1080px;margin:0 auto;padding:12px 22px;gap:16px}
   .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.3px}
   .brand .cube{width:22px;height:22px;border-radius:5px;
     background:linear-gradient(135deg,var(--accent),var(--accent-2));
     box-shadow:0 0 0 1px rgba(255,255,255,.08) inset}
-  .nav-links{display:flex;gap:20px;font-size:.95rem}
+  .nav-links{display:flex;gap:20px;font-size:.95rem;flex-wrap:wrap}
   .nav-links a{color:var(--muted)}
   .nav-links a:hover{color:var(--ink)}
+  @media(max-width:640px){.nav-links{display:none}}
 
-  .hero{padding:78px 0 46px}
-  .tag{display:inline-block;font-family:var(--mono);font-size:.78rem;letter-spacing:.12em;
-    text-transform:uppercase;color:var(--accent);border:1px solid var(--line);
+  .hero{padding:74px 0 40px}
+  .tag{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.78rem;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--accent);border:1px solid var(--line);
     background:rgba(123,212,74,.06);padding:6px 12px;border-radius:999px;margin-bottom:22px}
-  h1{font-size:clamp(2.5rem,6vw,4.3rem);line-height:1.02;margin:0 0 18px;
+  h1{font-size:clamp(2.4rem,6vw,4.2rem);line-height:1.03;margin:0 0 18px;
     letter-spacing:-.02em;font-weight:900}
   h1 .grad{background:linear-gradient(120deg,var(--accent),var(--gold));
     -webkit-background-clip:text;background-clip:text;color:transparent}
-  .lede{font-size:clamp(1.05rem,2.2vw,1.3rem);color:var(--muted);max-width:60ch;margin:0 0 30px}
+  .lede{font-size:clamp(1.05rem,2.2vw,1.3rem);color:var(--muted);max-width:62ch;margin:0 0 30px}
   .cta{display:flex;flex-wrap:wrap;gap:14px}
   .btn{display:inline-flex;align-items:center;gap:9px;font-weight:700;font-size:1rem;
     padding:13px 22px;border-radius:12px;border:1px solid transparent;cursor:pointer}
@@ -68,7 +75,9 @@
 
   section{padding:46px 0;border-top:1px solid var(--line)}
   h2{font-size:clamp(1.5rem,3.4vw,2.1rem);margin:0 0 8px;letter-spacing:-.01em}
-  .sub{color:var(--muted);margin:0 0 28px;max-width:62ch}
+  .sub{color:var(--muted);margin:0 0 28px;max-width:64ch}
+  .kicker{font-family:var(--mono);font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 10px}
 
   .grid{display:grid;gap:18px}
   .cards{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
@@ -78,16 +87,56 @@
   .card p{margin:0;color:var(--muted);font-size:.95rem}
   .card .ico{font-size:1.4rem;margin-bottom:10px;display:block}
 
+  .status-grid{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .stat{background:linear-gradient(180deg,var(--panel),var(--bg-2));
+    border:1px solid var(--line);border-radius:var(--radius);padding:22px;position:relative;overflow:hidden}
+  .stat::after{content:"";position:absolute;inset:0 0 auto 0;height:3px;
+    background:var(--line);transition:background .3s}
+  .stat.online::after{background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+  .stat.offline::after{background:var(--danger)}
+  .stat-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .stat-head h3{margin:0;font-size:1rem;letter-spacing:.02em}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block;flex:none}
+  .dot.online{background:var(--accent);box-shadow:0 0 0 4px rgba(123,212,74,.18);animation:pulse 2s infinite}
+  .dot.offline{background:var(--danger)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(123,212,74,.35)}70%{box-shadow:0 0 0 9px rgba(123,212,74,0)}100%{box-shadow:0 0 0 0 rgba(123,212,74,0)}}
+  .state{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.8rem;
+    text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+  .state.online{color:var(--accent)}
+  .state.offline{color:var(--danger)}
+  .big{font-size:2.4rem;font-weight:900;letter-spacing:-.02em;margin:14px 0 2px;line-height:1}
+  .big small{font-size:.95rem;font-weight:600;color:var(--muted);letter-spacing:0}
+  .meta{font-family:var(--mono);font-size:.82rem;color:var(--muted);margin-top:10px;display:grid;gap:4px}
+  .meta b{color:var(--ink);font-weight:600}
+  .bar{height:8px;border-radius:999px;background:#0a0d0a;border:1px solid var(--line);
+    overflow:hidden;margin-top:14px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    width:0;transition:width .5s}
+  .status-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;
+    font-size:.85rem;color:var(--muted)}
+  .refresh{border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--ink);
+    border-radius:9px;padding:7px 12px;font-size:.82rem;cursor:pointer;font-weight:600}
+  .refresh:hover{border-color:var(--accent);color:var(--accent)}
+
   .join-grid{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
   .addr{display:flex;align-items:center;gap:10px;margin-top:14px;
     background:#0a0d0a;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .addr code{font-family:var(--mono);font-size:.95rem;color:var(--gold);
     overflow:auto;white-space:nowrap;flex:1}
   .copy{border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--ink);
-    border-radius:9px;padding:7px 11px;font-size:.82rem;cursor:pointer;font-weight:600}
+    border-radius:9px;padding:7px 11px;font-size:.82rem;cursor:pointer;font-weight:600;flex:none}
   .copy:hover{border-color:var(--accent);color:var(--accent)}
   .pill{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;
     color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+
+  ol.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:14px}
+  ol.steps li{counter-increment:s;position:relative;padding:16px 18px 16px 58px;
+    background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--line);border-radius:14px}
+  ol.steps li::before{content:counter(s);position:absolute;left:16px;top:15px;width:28px;height:28px;
+    border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:.85rem;
+    color:#08130a;background:linear-gradient(135deg,var(--accent),var(--accent-2))}
+  ol.steps li b{display:block;margin-bottom:2px}
+  ol.steps li span{color:var(--muted);font-size:.94rem}
 
   .form-card{background:linear-gradient(180deg,var(--panel),var(--bg-2));
     border:1px solid var(--line);border-radius:var(--radius);padding:26px;max-width:640px}
@@ -101,9 +150,9 @@
   .check input{width:auto;margin-top:5px}
   .check label{font-weight:500;color:var(--muted);font-size:.92rem;margin:0}
   .note{font-size:.85rem;color:var(--muted)}
-  .status{margin-top:14px;font-size:.95rem;display:none;padding:12px 14px;border-radius:11px}
-  .status.ok{display:block;color:#0a130a;background:var(--accent);font-weight:700}
-  .status.err{display:block;color:#ffd9d9;background:#3a1414;border:1px solid #7a2b2b}
+  .status-msg{margin-top:14px;font-size:.95rem;display:none;padding:12px 14px;border-radius:11px}
+  .status-msg.ok{display:block;color:#0a130a;background:var(--accent);font-weight:700}
+  .status-msg.err{display:block;color:#ffd9d9;background:#3a1414;border:1px solid #7a2b2b}
 
   footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--muted);font-size:.9rem}
   footer .wrap{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between}
@@ -115,9 +164,11 @@
   <div class="nav-inner">
     <div class="brand"><span class="cube"></span> FB-SMP</div>
     <nav class="nav-links">
+      <a href="#status">Live status</a>
       <a href="#join">How to join</a>
-      <a href="#features">The world</a>
+      <a href="#world">The world</a>
       <a href="#signup">Sign up</a>
+      <a href="#openhands">Built with OpenHands</a>
     </nav>
   </div>
 </header>
@@ -125,18 +176,59 @@
 <main class="wrap">
 
   <section class="hero" style="border-top:none">
-    <span class="tag">Survival multiplayer · Java &amp; Bedrock</span>
-    <h1>One world.<br><span class="grad">Everyone welcome.</span></h1>
+    <span class="tag"><span class="dot" id="hero-dot"></span> <span id="hero-state">Checking status…</span></span>
+    <h1>One world.<br><span class="grad">Always on.</span></h1>
     <p class="lede">FB-SMP is a long-running survival world where Java and Bedrock players
       build side by side. A player-run economy, protected builds, and a community that
-      actually sticks around.</p>
+      actually sticks around — online around the clock.</p>
     <div class="cta">
       <a class="btn primary" href="#join">Join the server</a>
-      <a class="btn ghost" href="#signup">Sign up for an invite</a>
+      <a class="btn ghost" href="#status">See live status</a>
+    </div>
+  </section>
+
+  <section id="status">
+    <p class="kicker">Live</p>
+    <h2>Server status</h2>
+    <p class="sub">Checked from a third party every minute, so this reflects what players
+      actually see when they connect — not just what the host thinks.</p>
+
+    <div class="grid status-grid">
+      <div class="stat" id="java-stat">
+        <div class="stat-head">
+          <h3>Java Edition</h3>
+          <span class="state" id="java-state"><span class="dot" id="java-dot"></span> Checking…</span>
+        </div>
+        <div class="big" id="java-players">—<small> players online</small></div>
+        <div class="bar"><i id="java-bar"></i></div>
+        <div class="meta">
+          <span>Version <b id="java-version">—</b></span>
+          <span>Address <b>cairo-paste.tun.ply.gg:25565</b></span>
+        </div>
+      </div>
+
+      <div class="stat" id="bedrock-stat">
+        <div class="stat-head">
+          <h3>Bedrock Edition</h3>
+          <span class="state" id="bedrock-state"><span class="dot" id="bedrock-dot"></span> Checking…</span>
+        </div>
+        <div class="big" id="bedrock-players">—<small> players online</small></div>
+        <div class="bar"><i id="bedrock-bar"></i></div>
+        <div class="meta">
+          <span>Version <b id="bedrock-version">—</b></span>
+          <span>Address <b>fried-toilette.tun.ply.gg:37298</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-foot">
+      <button class="refresh" id="refresh-btn" type="button">Refresh now</button>
+      <span id="checked-at">Last checked: —</span>
     </div>
   </section>
 
   <section id="join">
+    <p class="kicker">Get in</p>
     <h2>How to join</h2>
     <p class="sub">Bedrock players connect through Geyser, so both editions share the same
       world. Pick your edition, copy the address, and you are in.</p>
@@ -144,7 +236,7 @@
       <div class="card">
         <span class="pill">Java Edition</span>
         <h3 style="margin-top:12px">Java players</h3>
-        <p>Add the server in Minecraft, paste the address, and join.</p>
+        <p>Add the server in Minecraft, paste the address, and join. Java 1.21+ works.</p>
         <div class="addr">
           <code id="java-addr">cairo-paste.tun.ply.gg:25565</code>
           <button class="copy" data-copy="java-addr">Copy</button>
@@ -153,35 +245,43 @@
       <div class="card">
         <span class="pill">Bedrock · Geyser</span>
         <h3 style="margin-top:12px">Bedrock players</h3>
-        <p>Phone, console, or Windows. Add a server and use this address and port.</p>
+        <p>Phone, console, or Windows. Add a server, then use this address and port.</p>
         <div class="addr">
           <code id="bedrock-addr">fried-toilette.tun.ply.gg:37298</code>
           <button class="copy" data-copy="bedrock-addr">Copy</button>
         </div>
       </div>
     </div>
+
+    <ol class="steps" style="margin-top:24px">
+      <li><b>Copy your address</b><span>Java or Bedrock — both reach the same world.</span></li>
+      <li><b>Add it in Minecraft</b><span>Multiplayer → Add Server → paste the address and port.</span></li>
+      <li><b>Join and say hello</b><span>You land with a starter kit in your mail. Use <code>/help</code> to explore.</span></li>
+    </ol>
   </section>
 
-  <section id="features">
+  <section id="world">
+    <p class="kicker">The world</p>
     <h2>What is waiting for you</h2>
     <p class="sub">Everything that makes a survival world worth logging into again.</p>
     <div class="grid cards">
       <div class="card"><span class="ico">🧱</span><h3>Survival, not chaos</h3>
-        <p>Land claims and rollback keep griefers out. Build knowing it stays.</p></div>
+        <p>Protected builds and rollback keep griefers out. Build knowing it stays.</p></div>
       <div class="card"><span class="ico">🛒</span><h3>A real economy</h3>
-        <p>Player shops, a marketplace and loans. Trade, specialize, get rich.</p></div>
+        <p>Player shops, an auction house, and loans. Trade, specialize, get rich.</p></div>
       <div class="card"><span class="ico">📱</span><h3>Crossplay</h3>
         <p>Java and Bedrock in one world through Geyser and Floodgate.</p></div>
       <div class="card"><span class="ico">⏱️</span><h3>Always on</h3>
-        <p>Automatic restarts and monitoring keep the world online around the clock.</p></div>
+        <p>Automatic restarts, monitoring, and a health watchdog keep the world online.</p></div>
       <div class="card"><span class="ico">🏘️</span><h3>Community first</h3>
-        <p>Shared towns, group projects and events — not a solo grind.</p></div>
+        <p>Shared towns, group projects, and events — not a solo grind.</p></div>
       <div class="card"><span class="ico">🛡️</span><h3>Fair play</h3>
         <p>Active moderation and clear rules, so everyone gets a fair start.</p></div>
     </div>
   </section>
 
   <section id="signup">
+    <p class="kicker">Get an invite</p>
     <h2>Sign up for an invite</h2>
     <p class="sub">Leave your details and we will send you the join info and whitelist you.
       We only use this to reach you about the server.</p>
@@ -214,7 +314,7 @@
           <label for="f-consent">Yes, you may reply to me about joining FB-SMP.</label>
         </div>
         <button class="btn primary" type="submit" id="submit-btn">Send my request</button>
-        <div class="status" id="status" role="status" aria-live="polite"></div>
+        <div class="status-msg" id="form-status" role="status" aria-live="polite"></div>
         <p class="note" style="margin-top:12px">Submissions are public intake for this site
           and are read by the server owners. Please do not include sensitive information.</p>
       </form>
@@ -224,6 +324,20 @@
       <h3 style="margin-top:0">Sign up on the FB-SMP site</h3>
       <p class="note">The sign-up form is handled on the FB-SMP server site. Open it there to send your request.</p>
       <a class="btn primary" href="https://fb-smp.birta.link/#signup">Open the sign-up form</a>
+    </div>
+  </section>
+
+  <section id="openhands">
+    <p class="kicker">Under the hood</p>
+    <h2>Built and operated with OpenHands</h2>
+    <p class="sub">FB-SMP is developed, tested, and deployed by an AI agent running on
+      OpenHands — from the Paper plugin and economy to the 24/7 deployment automation.
+      Read the source, file an issue, or open a pull request. Everything the agent knows
+      about this project is written down in the repository.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/firebreadga359-bot/FB-SMP.net" rel="noopener">Repository on GitHub</a>
+      <a class="btn ghost" href="https://github.com/firebreadga359-bot/FB-SMP.net/blob/main/AGENTS.md" rel="noopener">Project notes</a>
+      <a class="btn ghost" href="https://docs.openhands.dev/" rel="noopener">OpenHands docs</a>
     </div>
   </section>
 
@@ -237,12 +351,74 @@
 </footer>
 
 <script>
-  // Copy-to-clipboard for the join addresses.
+  /* Live server status (third-party, CORS-enabled). */
+  var JAVA = { edition: 'java', host: 'cairo-paste.tun.ply.gg', port: 25565 };
+  var BEDROCK = { edition: 'bedrock', host: 'fried-toilette.tun.ply.gg', port: 37298 };
+  var REFRESH_MS = 60000;
+
+  function setStatus(prefix, data) {
+    var stat = document.getElementById(prefix + '-stat');
+    var state = document.getElementById(prefix + '-state');
+    var players = document.getElementById(prefix + '-players');
+    var version = document.getElementById(prefix + '-version');
+    var bar = document.getElementById(prefix + '-bar');
+
+    var online = data && data.online === true;
+    stat.className = 'stat ' + (online ? 'online' : 'offline');
+    state.className = 'state ' + (online ? 'online' : 'offline');
+    state.innerHTML = '<span class="dot ' + (online ? 'online' : 'offline') + '"></span> ' +
+      (online ? 'Online' : 'Offline');
+
+    if (online && data.players) {
+      var n = data.players.online || 0;
+      var max = data.players.max || 0;
+      players.innerHTML = n + '<small> of ' + max + ' players online</small>';
+      bar.style.width = max > 0 ? Math.min(100, Math.round((n / max) * 100)) + '%' : '0%';
+    } else {
+      players.innerHTML = '—<small> players online</small>';
+      bar.style.width = '0%';
+    }
+
+    version.textContent = (online && data.version && data.version.name) ? data.version.name : '—';
+  }
+
+  function setHero(anyOnline) {
+    document.getElementById('hero-dot').className = 'dot ' + (anyOnline ? 'online' : 'offline');
+    document.getElementById('hero-state').textContent = anyOnline ? 'Online now' : 'Currently offline';
+  }
+
+  function fetchStatus(server) {
+    var url = 'https://api.mcstatus.io/v2/status/' + server.edition + '/' +
+      server.host + ':' + server.port;
+    return fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { online: false }; });
+  }
+
+  function refresh() {
+    var btn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    Promise.all([fetchStatus(JAVA), fetchStatus(BEDROCK)]).then(function (results) {
+      setStatus('java', results[0]);
+      setStatus('bedrock', results[1]);
+      setHero(results[0].online === true || results[1].online === true);
+      document.getElementById('checked-at').textContent =
+        'Last checked: ' + new Date().toLocaleTimeString();
+      btn.disabled = false;
+      btn.textContent = 'Refresh now';
+    });
+  }
+
+  document.getElementById('refresh-btn').addEventListener('click', refresh);
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+
+  /* Copy-to-clipboard for the join addresses. */
   document.querySelectorAll('.copy').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var el = document.getElementById(btn.dataset.copy);
-      var text = el.textContent.trim();
-      navigator.clipboard.writeText(text).then(function () {
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
         var old = btn.textContent;
         btn.textContent = 'Copied';
         setTimeout(function () { btn.textContent = old; }, 1400);
@@ -250,7 +426,7 @@
     });
   });
 
-  // Lead form: send JSON to the site's own host (relative URL), branch on "code".
+  /* Lead form: send JSON to the site's own host, branch on "code". */
   var ERROR_TEXT = {
     missing_field: 'Please fill in every required field.',
     invalid_value: 'One of the values was not valid. Please check and try again.',
@@ -266,21 +442,18 @@
   };
 
   var form = document.getElementById('join-form');
-  var status = document.getElementById('status');
+  var formStatus = document.getElementById('form-status');
   var submitBtn = document.getElementById('submit-btn');
 
-  // Birta's form intake has no CORS headers, so submissions only work on the
-  // site's own host. Off that host, show a link to the form instead.
   var FORM_HOSTS = ['fb-smp.birta.link', 'fb-smp.net', 'www.fb-smp.net'];
-  var onFormHost = FORM_HOSTS.indexOf(location.hostname) !== -1;
-  if (!onFormHost) {
-    document.getElementById('join-form').hidden = true;
+  if (FORM_HOSTS.indexOf(location.hostname) === -1) {
+    form.hidden = true;
     document.getElementById('signup-fallback').hidden = false;
   }
 
-  function show(cls, msg) {
-    status.className = 'status ' + cls;
-    status.textContent = msg;
+  function showForm(cls, msg) {
+    formStatus.className = 'status-msg ' + cls;
+    formStatus.textContent = msg;
   }
 
   form.addEventListener('submit', function (e) {
@@ -292,7 +465,7 @@
     var consent = document.getElementById('f-consent').checked;
 
     if (!name || !email || !platform || !consent) {
-      show('err', ERROR_TEXT.missing_field);
+      showForm('err', ERROR_TEXT.missing_field);
       return;
     }
 
@@ -301,7 +474,7 @@
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Sending…';
-    status.className = 'status';
+    formStatus.className = 'status-msg';
 
     fetch('/_forms/join', {
       method: 'POST',
@@ -316,14 +489,14 @@
       .then(function (r) {
         if (r.ok && (r.status === 201 || r.data.status === 'accepted')) {
           form.reset();
-          show('ok', 'Thanks — your request is in. We will be in touch about joining.');
+          showForm('ok', 'Thanks — your request is in. We will be in touch about joining.');
         } else {
           var code = r.data && r.data.code;
-          show('err', ERROR_TEXT[code] || 'We could not send that. Please try again in a moment.');
+          showForm('err', ERROR_TEXT[code] || 'We could not send that. Please try again in a moment.');
         }
       })
       .catch(function () {
-        show('err', 'Network problem — please check your connection and try again.');
+        showForm('err', 'Network problem — please check your connection and try again.');
       })
       .then(function () {
         submitBtn.disabled = false;

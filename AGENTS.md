@@ -131,6 +131,29 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   **403 code 1010** for POSTs with no `User-Agent`; curl passes by default but
   Python `urllib` must send one.
 
+## Website (`site/`)
+
+- `site/index.html` is a self-contained static page (no build step): join
+  addresses, feature tour, invite form, an "OpenHands" section linking the repo +
+  `AGENTS.md` + docs, and a **live status** panel.
+- Live status fetches `https://api.mcstatus.io/v2/status/{java,bedrock}/<host>:<port>`
+  in the browser (the API sends `access-control-allow-origin: *`, so no proxy is
+  needed). It refreshes every 60s and on a button. Keep the addresses in the
+  `JAVA`/`BEDROCK` JS objects in sync with the playit tunnels.
+- The invite form posts JSON to `/_forms/join` and only works on the form hosts
+  listed in `FORM_HOSTS` (`fb-smp.birta.link`, `fb-smp.net`, `www.fb-smp.net`);
+  off-host it hides the form and links to the Birta form instead.
+- Published to GitHub Pages by `.github/workflows/pages.yml` on pushes to `main`
+  under `site/`. `site/CNAME` = `fb-smp.net`. The repo root is a Minecraft
+  server, so only `site/` is uploaded.
+
+## Running it 24/7
+
+- `deploy/ALWAYS-ON.md` is the short "go always-on" runbook. The sandbox cannot
+  be a 24/7 host (`OH_RUNTIME_IDLE_TIMEOUT_SECONDS=1200`, no init). The VPS path
+  (`sudo bash deploy/vps-bootstrap.sh`) is the only one that survives a reboot
+  with no outside help.
+
 ## Shop and sell
 
 - Prices live in `plugins/FBSMP/shop.yml` (buy) and `sell_prices.yml` (sell),
