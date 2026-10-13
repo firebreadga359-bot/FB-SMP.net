@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog — FB-SMP</title>
+<meta name="description" content="Every change to the FB-SMP server and site, pulled live from the project repository.">
+<meta name="theme-color" content="#0a0e0b">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%237bd44a'/></svg>">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="cube"></span> FB-SMP</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <nav class="nav-links" id="nav-links">
+      <a href="features.html">Features</a>
+      <a href="join.html">Join</a>
+      <a href="stats.html">Status</a>
+      <a href="rules.html">Rules</a>
+      <a href="faq.html">FAQ</a>
+      <a href="changelog.html">Changelog</a>
+      <a href="signup.html">Sign up</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <p class="kicker">In the open</p>
+    <h1>What has<br><span class="grad">changed lately</span></h1>
+    <p class="lede">The server and this site are built in public. Below is the live commit
+      history, pulled from GitHub each time this page loads — no release notes to keep in sync.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/firebreadga359-bot/FB-SMP.net/commits/main" rel="noopener">Full history on GitHub</a>
+      <a class="btn ghost" href="https://github.com/firebreadga359-bot/FB-SMP.net/issues" rel="noopener">Open issues</a>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">Recent work</p>
+    <h2>Latest changes</h2>
+    <p class="sub">Each entry links to the commit that made it. This list is generated from
+      the repository's <code>main</code> branch.</p>
+    <div class="log" id="commit-log">
+      <p class="note">Loading recent commits…</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">How it works</p>
+    <h2>Why there is a changelog at all</h2>
+    <p class="sub">An agent that writes and deploys code needs a public record of what it did,
+      so the owners can audit changes without reading a diff.</p>
+    <div class="grid cards">
+      <div class="card"><span class="ico">📓</span><h3>Written down</h3>
+        <p>Project knowledge lives in <code>AGENTS.md</code> in the repository, so each session
+          starts informed.</p></div>
+      <div class="card"><span class="ico">🔗</span><h3>Traceable</h3>
+        <p>Every change is a commit or a pull request, not an untracked edit on a live host.</p></div>
+      <div class="card"><span class="ico">👀</span><h3>Reviewable</h3>
+        <p>Changes go through pull requests, so nothing lands on <code>main</code> unexamined.</p></div>
+      <div class="card"><span class="ico">🤖</span><h3>Agent-authored</h3>
+        <p>Commits are made by an AI agent on OpenHands, on behalf of the owners.</p></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <div class="brand" style="margin-bottom:10px"><span class="cube"></span> FB-SMP</div>
+        <p class="note" style="max-width:34ch">A community survival world for Java and Bedrock,
+          online around the clock.</p>
+      </div>
+      <div><h4>Play</h4><a href="join.html">How to join</a><a href="rules.html">Rules</a><a href="signup.html">Sign up</a></div>
+      <div><h4>Explore</h4><a href="features.html">Features</a><a href="stats.html">Status &amp; uptime</a><a href="faq.html">FAQ</a></div>
+      <div><h4>Project</h4><a href="changelog.html">Changelog</a><a href="https://github.com/firebreadga359-bot/FB-SMP.net" rel="noopener">GitHub</a><a href="https://docs.openhands.dev/" rel="noopener">OpenHands</a></div>
+    </div>
+    <div class="foot-bottom">
+      <span>FB-SMP — a community survival world.</span>
+      <span>Java &amp; Bedrock · Geyser · 24/7 · <span data-year></span></span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>
