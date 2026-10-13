@@ -81,6 +81,23 @@ jobs:
             echo "panel bridge ok"
           fi
 
+      - name: Ensure public panel tunnel
+        if: ${{ env.GH_TOKEN != '' }}
+        run: |
+          # A Codespaces container has no systemd, so the platform's own port
+          # forwarding never starts. Publish the panel through a Cloudflare
+          # quick tunnel instead; it survives without an init system.
+          gh codespace ssh -c "$CS" -- '
+            cd /workspaces || exit 0
+            if [ ! -x ./cloudflared ]; then
+              curl -sL -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && chmod +x cloudflared
+            fi
+            if [ -x ./fbsmp-panel-tunnel.sh ]; then
+              ./fbsmp-panel-tunnel.sh
+              echo "panel URL: $(cat panel-url.txt 2>/dev/null)"
+            fi
+          ' || true
+
       - name: Restart playit if a tunnel is down
         if: ${{ env.GH_TOKEN != '' }}
         run: |
