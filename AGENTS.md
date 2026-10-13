@@ -193,6 +193,15 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   inactivity and resumed, everything is gone until either the next keep-alive
   run or an interactive shell starts the keeper. A non-interactive `gh codespace
   ssh` does **not** run `.bashrc`, so it will not revive the keeper by itself.
+- The panel also has a **named tunnel** for a stable address,
+  `https://panel.fb-smp.net`. `deploy/cf-named-tunnel-setup.sh` rebuilds
+  `cf-credentials.json` from the Cloudflare API (idempotent), and
+  `deploy/fbsmp-named-tunnel.sh` runs it. **It only resolves once the zone is
+  active**: `fb-smp.net` is added in Cloudflare as `nicole.ns.cloudflare.com` /
+  `todd.ns.cloudflare.com`, but the registrar still serves GoDaddy nameservers,
+  so the hostname is NXDOMAIN until those are changed. Until then the quick
+  tunnel stays the live link and the keep-alive run switches `panel-url.txt` to
+  `panel.fb-smp.net` automatically once it serves.
 - To revive by hand: clear stale `keeper.lock`/`supervise.lock`, then
   `setsid nohup /workspaces/fbsmp-keeper.sh >>/workspaces/keeper.log 2>&1 </dev/null &`.
   The keeper rebuilds `logs/` and restarts the stack. Detached processes survive
