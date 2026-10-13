@@ -110,6 +110,46 @@ jobs:
             git push || true
           fi
 
+      - name: Ensure named panel tunnel (panel.fb-smp.net)
+        if: ${{ env.GH_TOKEN != '' && env.CF_API_TOKEN != '' }}
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: |
+          # Stable hostname. Rebuilds the tunnel credentials from the API when a
+          # fresh container has lost them, then (re)starts the tunnel. Secrets go
+          # over stdin, never the remote command line.
+          gh codespace cp -c "$CS" -e deploy/cf-named-tunnel-setup.sh remote:/workspaces/cf-named-tunnel-setup.sh || true
+          gh codespace cp -c "$CS" -e deploy/fbsmp-named-tunnel.sh remote:/workspaces/fbsmp-named-tunnel.sh || true
+          printf '%s\n%s\n%s\n' "$CF_API_TOKEN" "$CF_ACCOUNT_ID" "$CF_ZONE_ID" | \
+          gh codespace ssh -c "$CS" -- '
+            cd /workspaces || exit 0
+            IFS= read -r CF_API_TOKEN; IFS= read -r CF_ACCOUNT_ID; IFS= read -r CF_ZONE_ID
+            chmod +x ./cf-named-tunnel-setup.sh ./fbsmp-named-tunnel.sh 2>/dev/null
+            if [ ! -x ./cloudflared ]; then
+              curl -sL -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && chmod +x cloudflared
+            fi
+            [ -f ./cf-credentials.json ] || CF_API_TOKEN="$CF_API_TOKEN" CF_ACCOUNT_ID="$CF_ACCOUNT_ID" CF_ZONE_ID="$CF_ZONE_ID" bash ./cf-named-tunnel-setup.sh
+            ./fbsmp-named-tunnel.sh
+            echo "named tunnel processes: $(pgrep -cf credentials-file)"
+          ' || true
+          # Once the stable hostname actually serves the panel (DNS live), point
+          # the site at it; until then keep the working quick-tunnel URL.
+          if curl -sf -o /dev/null --max-time 15 https://panel.fb-smp.net/; then
+            echo "panel.fb-smp.net is live"
+            if [ "$(cat panel-url.txt 2>/dev/null)" != "https://panel.fb-smp.net" ]; then
+              printf '%s\n' "https://panel.fb-smp.net" > panel-url.txt
+              git config user.name openhands
+              git config user.email openhands@all-hands.dev
+              git add panel-url.txt
+              git commit -m "Point the site at panel.fb-smp.net" || true
+              git push || true
+            fi
+          else
+            echo "panel.fb-smp.net not resolvable yet (zone pending at the registrar)"
+          fi
+
       - name: Restart playit if a tunnel is down
         if: ${{ env.GH_TOKEN != '' }}
         run: |

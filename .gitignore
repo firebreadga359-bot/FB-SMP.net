@@ -88,3 +88,6 @@ _staging/
 # Uptime alert webhook URL (secret)
 .fbsmp-alert-webhook
 __pycache__/
+
+# Cloudflare named-tunnel credentials (runtime secret)
+cf-credentials.json
