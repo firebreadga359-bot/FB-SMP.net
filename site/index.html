@@ -227,6 +227,17 @@
     </div>
   </section>
 
+  <section id="panel">
+    <p class="kicker">Admin</p>
+    <h2>Control room</h2>
+    <p class="sub">Live operations console for the server — players, world, and economy.
+      The address below is refreshed automatically, so it always points at the running panel.</p>
+    <div class="cta">
+      <a class="btn primary" id="panel-link" href="https://github.com/firebreadga359-bot/FB-SMP.net" rel="noopener">Open the control room</a>
+    </div>
+    <p class="status-foot" id="panel-status" style="margin-top:12px">Resolving the control-room address…</p>
+  </section>
+
   <section id="join">
     <p class="kicker">Get in</p>
     <h2>How to join</h2>
@@ -409,6 +420,26 @@
       btn.textContent = 'Refresh now';
     });
   }
+
+  /* Resolve the current control-room address from the repo's panel-url.txt,
+     refreshed by the panel tunnel. Falls back to the repository if unavailable. */
+  (function () {
+    var link = document.getElementById('panel-link');
+    var note = document.getElementById('panel-status');
+    var RAW = 'https://raw.githubusercontent.com/firebreadga359-bot/FB-SMP.net/main/panel-url.txt';
+    fetch(RAW, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (t) {
+        var url = (t || '').trim();
+        if (!/^https:\/\/[a-z0-9.-]+$/i.test(url)) throw new Error('no url');
+        link.href = url;
+        link.textContent = 'Open the control room';
+        note.innerHTML = 'Live address: <a href="' + url + '" rel="noopener">' + url + '</a>';
+      })
+      .catch(function () {
+        note.textContent = 'Control-room address is set by the host; see the repository for the current link.';
+      });
+  })();
 
   document.getElementById('refresh-btn').addEventListener('click', refresh);
   refresh();
