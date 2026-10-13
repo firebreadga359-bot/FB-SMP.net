@@ -52,7 +52,31 @@ Implemented player commands:
 
 The implementation includes server-validated shop and auction purchases, safe mailbox delivery, loan and mortgage ledgers, community orders, persisted moderation, player settings, and server-side GUI controls. The starter kit is one-time, queued through player mail, and contains no weapons.
 
-**Incomplete / not production-ready:** `/gift` currently supports confirmed currency gifts only; item gifts are not implemented. Mortgage offers are disabled until `available-properties` is configured, and mortgage records are financial contracts only: they do not claim land or grant in-world ownership. Auction item recovery across a crash between inventory removal and listing persistence has not been proven safe. Review those paths and test on a staging server before enabling an economy with valuable items or property. The project does not include a land-claiming system.
+`/gift` supports confirmed currency gifts and confirmed item gifts. An item gift moves the held stack into a crash-safe escrow, and on `/gift confirm` it is delivered to the recipient's player mail. An unaccepted, cancelled, or timed-out item gift is returned to the sender by player mail, so no item is lost. Item gifting can be disabled with `gifts.yml` `allow-item-gifts: false` or the `fbsmp.gift.item` permission.
+
+**Not production-ready:** Mortgage offers are disabled until `available-properties` is configured, and mortgage records are financial contracts only: they do not claim land or grant in-world ownership. Review those paths and test on a staging server before enabling an economy with valuable items or property. The project does not include a land-claiming system.
+
+## Website
+
+`site/` is a static public page for players: join addresses for Java and Bedrock, a
+short feature tour, an invite form, and a **live status** panel that reads the public
+addresses from `api.mcstatus.io` (a third party, CORS-enabled) and shows whether each
+edition is online and how many players are on. It is published to GitHub Pages by
+`.github/workflows/pages.yml` on every change under `site/`, with `site/CNAME`
+mapping it to `fb-smp.net`. No build step and no server are required.
+
+The page also points visitors at the source repository and the project notes so they
+can read how the server is built and operated with OpenHands.
+
+## Running it 24/7
+
+The OpenHands agent sandbox is not a permanent host: it stops after about 20 minutes
+idle and has no init system. To run FB-SMP continuously, install it on a VPS with
+`sudo bash deploy/vps-bootstrap.sh` — one command sets up Paper, Velocity,
+Geyser/Floodgate, the playit.gg tunnel, the admin-panel bridge, a health watchdog, and
+nightly backups as systemd services that restart on crash and reboot. See
+[`deploy/ALWAYS-ON.md`](deploy/ALWAYS-ON.md) for the short runbook and
+[`deploy/README.md`](deploy/README.md) for the full install and world-move steps.
 
 ## Configuration
 

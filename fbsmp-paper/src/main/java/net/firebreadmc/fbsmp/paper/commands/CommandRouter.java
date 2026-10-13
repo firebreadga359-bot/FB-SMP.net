@@ -827,23 +827,33 @@ public final class CommandRouter implements CommandExecutor {
         ItemStack listed = held.clone();
         String itemData = Base64.getEncoder().encodeToString(listed.serializeAsBytes());
         int quantity = listed.getAmount();
+        UUID sellerId = player.getUniqueId();
+        String escrowId;
+        try {
+            escrowId = database.createItemEscrow(sellerId, itemData, "AUCTION", System.currentTimeMillis());
+        } catch (SQLException exception) {
+            plugin.getLogger().warning("Could not record auction escrow for " + sellerId + ": "
+                    + exception.getMessage());
+            player.sendMessage(color("&cThe listing could not be created. Your item was left in your inventory."));
+            return;
+        }
         held.setAmount(0);
         player.saveData();
         long expiresAt = System.currentTimeMillis()
                 + Math.max(1, featureConfig("auction").getLong("listing-expiration-hours", 72)) * 3_600_000L;
-        UUID sellerId = player.getUniqueId();
-        String sellerName = player.getName();
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             long id = -1;
             try {
                 id = database.createAuction(sellerId, itemData, quantity, price, expiresAt,
-                        System.currentTimeMillis());
+                        System.currentTimeMillis(), escrowId);
             } catch (Exception exception) {
                 plugin.getLogger().warning("Auction listing failed for " + sellerId + ": " + exception.getMessage());
             }
             if (id <= 0) {
                 try {
-                    database.queueMailboxItem(sellerId, itemData, System.currentTimeMillis());
+                    // Mails the escrowed item back and clears the row atomically.
+                    // If this fails, startup recovery returns the item instead.
+                    database.deliverEscrowTo(escrowId, sellerId, System.currentTimeMillis());
                 } catch (SQLException exception) {
                     plugin.getLogger().severe("Could not return failed auction item for " + sellerId + ": "
                             + exception.getMessage());
@@ -1158,21 +1168,11 @@ public final class CommandRouter implements CommandExecutor {
                 return;
             }
             pendingGifts.remove(player.getUniqueId(), gift);
-            Player recipient = Bukkit.getPlayer(gift.recipient);
-            String recipientName = recipient == null ? gift.recipientName : recipient.getName();
-            query(player, () -> database.transfer(player.getUniqueId(), player.getName(), gift.recipient,
-                    recipientName, gift.amountMinor, "GIFT", "Confirmed currency gift",
-                    System.currentTimeMillis()), (target, sent) -> {
-                if (!sent) {
-                    target.sendMessage(color("&cGift failed: insufficient funds."));
-                } else {
-                    target.sendMessage(color("&aGift sent: &6" + Money.format(gift.amountMinor) + "&a."));
-                    if (recipient != null && recipient.isOnline()) {
-                        recipient.sendMessage(color("&aReceived a confirmed gift of &6"
-                                + Money.format(gift.amountMinor) + "&a."));
-                    }
-                }
-            });
+            if (gift.isItem()) {
+                confirmItemGift(player, gift);
+            } else {
+                confirmCurrencyGift(player, gift);
+            }
             return;
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("accept")) {
@@ -1183,24 +1183,34 @@ public final class CommandRouter implements CommandExecutor {
                 player.sendMessage(color("&cNo current gift request from that player."));
                 return;
             }
-            pendingGifts.put(senderPlayer.getUniqueId(), new PendingGift(gift.recipient, gift.recipientName,
-                    gift.amountMinor, gift.expiresAt, true));
+            pendingGifts.put(senderPlayer.getUniqueId(), gift.asAccepted());
             player.sendMessage(color("&aGift accepted. The sender must use &f/gift confirm&a."));
             senderPlayer.sendMessage(color("&a" + player.getName() + " accepted your gift. Use &f/gift confirm&a."));
             return;
         }
         if (args.length == 1 && args[0].equalsIgnoreCase("cancel")) {
-            pendingGifts.remove(player.getUniqueId());
+            PendingGift cancelled = pendingGifts.remove(player.getUniqueId());
             player.sendMessage(color("&7Pending gift cancelled."));
+            refundItemGift(player.getUniqueId(), cancelled);
             return;
         }
         if (args.length != 2) {
-            player.sendMessage(color("&cUsage: /gift <online player> <amount> | /gift accept <sender> | /gift confirm | /gift cancel"));
+            player.sendMessage(color("&cUsage: /gift <online player> <amount> | /gift <online player> item | "
+                    + "/gift accept <sender> | /gift confirm | /gift cancel"));
             return;
         }
         Player recipient = Bukkit.getPlayerExact(args[0]);
         if (recipient == null || recipient.equals(player)) {
             player.sendMessage(color("&cChoose another online player."));
+            return;
+        }
+        // Replacing an outstanding request must return any escrowed item first,
+        // otherwise its escrow row would linger until the next startup recovery.
+        refundItemGift(player.getUniqueId(), pendingGifts.remove(player.getUniqueId()));
+        long confirmationWindow = Math.max(5, featureConfig("gifts").getLong("confirmation-timeout-seconds", 30))
+                * 1000L;
+        if (args[1].equalsIgnoreCase("item")) {
+            createItemGift(player, recipient, confirmationWindow);
             return;
         }
         long amount;
@@ -1216,13 +1226,118 @@ public final class CommandRouter implements CommandExecutor {
             player.sendMessage(color("&c" + exception.getMessage()));
             return;
         }
-        PendingGift gift = new PendingGift(recipient.getUniqueId(), recipient.getName(), amount,
-                System.currentTimeMillis() + 60_000L, false);
+        PendingGift gift = PendingGift.currency(recipient.getUniqueId(), recipient.getName(), amount,
+                System.currentTimeMillis() + confirmationWindow);
         pendingGifts.put(player.getUniqueId(), gift);
         player.sendMessage(color("&eGift request created. " + recipient.getName()
                 + " must use &f/gift accept " + player.getName() + "&e; then confirm with &f/gift confirm&e."));
         recipient.sendMessage(color("&e" + player.getName() + " offers you &6" + Money.format(amount)
                 + "&e. Use &f/gift accept " + player.getName() + "&e to accept."));
+    }
+
+    private void confirmCurrencyGift(Player player, PendingGift gift) {
+        Player recipient = Bukkit.getPlayer(gift.recipient);
+        String recipientName = recipient == null ? gift.recipientName : recipient.getName();
+        query(player, () -> database.transfer(player.getUniqueId(), player.getName(), gift.recipient,
+                recipientName, gift.amountMinor, "GIFT", "Confirmed currency gift",
+                System.currentTimeMillis()), (target, sent) -> {
+            if (!sent) {
+                target.sendMessage(color("&cGift failed: insufficient funds."));
+            } else {
+                target.sendMessage(color("&aGift sent: &6" + Money.format(gift.amountMinor) + "&a."));
+                if (recipient != null && recipient.isOnline()) {
+                    recipient.sendMessage(color("&aReceived a confirmed gift of &6"
+                            + Money.format(gift.amountMinor) + "&a."));
+                }
+            }
+        });
+    }
+
+    private void confirmItemGift(Player player, PendingGift gift) {
+        Player recipient = Bukkit.getPlayer(gift.recipient);
+        query(player, () -> database.deliverEscrowTo(gift.escrowId, gift.recipient, System.currentTimeMillis()),
+                (target, delivered) -> {
+                    if (!delivered) {
+                        target.sendMessage(color("&cThat gift could not be delivered. "
+                                + "The item will be returned by player mail."));
+                        return;
+                    }
+                    target.sendMessage(color("&aGift sent: &f" + gift.quantity + "x " + gift.itemName + "&a."));
+                    if (recipient != null && recipient.isOnline()) {
+                        recipient.sendMessage(color("&aReceived a confirmed gift of &f" + gift.quantity + "x "
+                                + gift.itemName + "&a. It is in your player mail."));
+                        listener.deliverMailbox(recipient);
+                    }
+                });
+    }
+
+    private void createItemGift(Player player, Player recipient, long confirmationWindow) {
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held.getType().isAir()) {
+            player.sendMessage(color("&cHold the item you want to gift."));
+            return;
+        }
+        if (!player.hasPermission("fbsmp.gift.item")
+                || !featureConfig("gifts").getBoolean("allow-item-gifts", true)) {
+            player.sendMessage(color("&cItem gifting is not enabled."));
+            return;
+        }
+        ItemStack staged = held.clone();
+        int quantity = staged.getAmount();
+        String itemName = staged.getType().name();
+        String escrowId;
+        try {
+            escrowId = database.createItemEscrow(player.getUniqueId(),
+                    Base64.getEncoder().encodeToString(staged.serializeAsBytes()), "GIFT",
+                    System.currentTimeMillis());
+        } catch (SQLException exception) {
+            plugin.getLogger().warning("Could not record gift escrow for " + player.getUniqueId() + ": "
+                    + exception.getMessage());
+            player.sendMessage(color("&cThat item could not be prepared for gifting. It stayed in your inventory."));
+            return;
+        }
+        held.setAmount(0);
+        player.saveData();
+        PendingGift gift = PendingGift.item(recipient.getUniqueId(), recipient.getName(), escrowId,
+                quantity, itemName, System.currentTimeMillis() + confirmationWindow);
+        pendingGifts.put(player.getUniqueId(), gift);
+        long delayTicks = Math.max(1, confirmationWindow / 50L);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> expireItemGift(player.getUniqueId(), gift), delayTicks);
+        player.sendMessage(color("&eGift request created. " + recipient.getName() + " must use &f/gift accept "
+                + player.getName() + "&e; then confirm with &f/gift confirm&e. The item is held in escrow."));
+        recipient.sendMessage(color("&e" + player.getName() + " offers you &f" + quantity + "x " + itemName
+                + "&e. Use &f/gift accept " + player.getName() + "&e to accept."));
+    }
+
+    /** Returns an unaccepted or cancelled item gift to the sender's mailbox. */
+    private void refundItemGift(UUID senderId, PendingGift gift) {
+        if (gift == null || !gift.isItem()) {
+            return;
+        }
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                database.deliverEscrowTo(gift.escrowId, senderId, System.currentTimeMillis());
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Player online = Bukkit.getPlayer(senderId);
+                    if (online != null) {
+                        listener.deliverMailbox(online);
+                        online.sendMessage(color("&7Your item gift was returned by player mail."));
+                    }
+                });
+            } catch (SQLException exception) {
+                plugin.getLogger().warning("Could not refund item gift escrow " + gift.escrowId + ": "
+                        + exception.getMessage());
+            }
+        });
+    }
+
+    private void expireItemGift(UUID senderId, PendingGift gift) {
+        PendingGift current = pendingGifts.get(senderId);
+        if (current != gift || gift.accepted || gift.expiresAt > System.currentTimeMillis()) {
+            return;
+        }
+        pendingGifts.remove(senderId, gift);
+        refundItemGift(senderId, gift);
     }
 
     private void orders(CommandSender sender, String[] args) {
@@ -1959,8 +2074,26 @@ public final class CommandRouter implements CommandExecutor {
         T run() throws Exception;
     }
 
-    private record PendingGift(UUID recipient, String recipientName, long amountMinor,
-                               long expiresAt, boolean accepted) {}
+    private record PendingGift(UUID recipient, String recipientName, long amountMinor, String escrowId,
+                               int quantity, String itemName, long expiresAt, boolean accepted) {
+        static PendingGift currency(UUID recipient, String recipientName, long amountMinor, long expiresAt) {
+            return new PendingGift(recipient, recipientName, amountMinor, null, 0, null, expiresAt, false);
+        }
+
+        static PendingGift item(UUID recipient, String recipientName, String escrowId, int quantity,
+                                String itemName, long expiresAt) {
+            return new PendingGift(recipient, recipientName, 0L, escrowId, quantity, itemName, expiresAt, false);
+        }
+
+        boolean isItem() {
+            return escrowId != null;
+        }
+
+        PendingGift asAccepted() {
+            return new PendingGift(recipient, recipientName, amountMinor, escrowId, quantity, itemName,
+                    expiresAt, true);
+        }
+    }
     private record TeleportRequest(UUID requester, UUID recipient, boolean here, long expiresAt) {}
     private record StatsDisplay(FbsmpDatabase.PlayerStats stats, String date) {}
 

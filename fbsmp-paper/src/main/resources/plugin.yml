@@ -77,7 +77,7 @@ commands:
     description: View your mortgage account.
   gift:
     description: Start a secure item or currency gift.
-    usage: /gift <player> <amount>
+    usage: /gift <player> <amount> | /gift <player> item | /gift accept <sender> | /gift confirm | /gift cancel
   orders:
     description: Manage community delivery orders.
   ban:
@@ -116,3 +116,6 @@ permissions:
   fbsmp.loan.limit.bypass:
     description: Bypass loan borrowing limits.
     default: op
+  fbsmp.gift.item:
+    description: Gift items (not just currency) to other players.
+    default: true

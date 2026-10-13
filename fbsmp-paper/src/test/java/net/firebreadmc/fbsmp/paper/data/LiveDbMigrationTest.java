@@ -65,7 +65,7 @@ class LiveDbMigrationTest {
         database.close();
 
         try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + copy)) {
-            assertEquals(5, count(connection, "SELECT count(*) FROM schema_migrations"));
+            assertEquals(6, count(connection, "SELECT count(*) FROM schema_migrations"));
             assertEquals("ok", scalar(connection, "PRAGMA integrity_check"));
 
             assertTrue(hasColumn(connection, "loans", "issue_day_index"));
@@ -73,7 +73,7 @@ class LiveDbMigrationTest {
             assertTrue(hasColumn(connection, "loans", "original_remaining_minor"));
             for (String table : new String[]{"loan_timeouts", "loan_events", "loan_notices",
                     "loan_meta", "fbsmp_audit_log", "admin_users", "dashboard_settings",
-                    "admin_console_log", "scheduled_tasks", "announcements"}) {
+                    "admin_console_log", "scheduled_tasks", "announcements", "item_escrow"}) {
                 assertTrue(tableExists(connection, table), "missing migration table " + table);
             }
 
