@@ -43,11 +43,11 @@ class AdminDashboardDatabaseTest {
     }
 
     @Test
-    void v5SchemaIsAppliedAndIdempotentAcrossReopen() throws Exception {
-        assertEquals(5, database.schemaVersion());
+    void schemaIsAppliedAndIdempotentAcrossReopen() throws Exception {
+        assertEquals(6, database.schemaVersion());
         database.close();
         database = new FbsmpDatabase(directory.resolve("fbsmp-admin-test.sqlite"), getClass().getClassLoader());
-        assertEquals(5, database.schemaVersion());
+        assertEquals(6, database.schemaVersion());
         assertEquals(2, database.playerDirectory("", 50).size());
     }
 

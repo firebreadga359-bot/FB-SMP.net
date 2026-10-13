@@ -53,6 +53,7 @@ public final class FbsmpDatabase implements AutoCloseable {
         applyMigration(resourceLoader, 3, "db/migration/V3__sell_escrow.sql");
         applyMigration(resourceLoader, 4, "db/migration/V4__shop_sell_loan_upgrade.sql");
         applyMigration(resourceLoader, 5, "db/migration/V5__admin_dashboard.sql");
+        applyMigration(resourceLoader, 6, "db/migration/V6__item_escrow.sql");
         synchronized (lock) {
             try (Statement statement = connection.createStatement()) {
                 statement.executeUpdate("""
@@ -1102,35 +1103,69 @@ public final class FbsmpDatabase implements AutoCloseable {
 
     public long createAuction(UUID seller, String itemData, int quantity, long priceMinor,
                               long expiresAt, long now) throws SQLException {
+        return createAuction(seller, itemData, quantity, priceMinor, expiresAt, now, null);
+    }
+
+    /**
+     * Creates a listing and, when an escrow row was recorded before the item left
+     * the seller's inventory, clears it in the same transaction. Either both the
+     * listing exists and the escrow is gone, or neither changed.
+     */
+    public long createAuction(UUID seller, String itemData, int quantity, long priceMinor,
+                              long expiresAt, long now, String escrowId) throws SQLException {
         if (quantity <= 0 || priceMinor <= 0 || itemData == null || itemData.isBlank()) {
             throw new IllegalArgumentException("Auction listing is invalid.");
         }
         synchronized (lock) {
-            try (PreparedStatement count = connection.prepareStatement("""
-                    SELECT COUNT(*) FROM auctions WHERE seller_uuid = ? AND status = 'OPEN' AND expires_at > ?
-                    """)) {
-                count.setString(1, seller.toString());
-                count.setLong(2, now);
-                try (ResultSet result = count.executeQuery()) {
-                    if (result.next() && result.getInt(1) >= 10) {
-                        return -1;
+            boolean previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement count = connection.prepareStatement("""
+                        SELECT COUNT(*) FROM auctions WHERE seller_uuid = ? AND status = 'OPEN' AND expires_at > ?
+                        """)) {
+                    count.setString(1, seller.toString());
+                    count.setLong(2, now);
+                    try (ResultSet result = count.executeQuery()) {
+                        if (result.next() && result.getInt(1) >= 10) {
+                            connection.rollback();
+                            return -1;
+                        }
                     }
                 }
-            }
-            try (PreparedStatement statement = connection.prepareStatement("""
-                    INSERT INTO auctions(seller_uuid, item_data, quantity, price_minor, status, expires_at, created_at)
-                    VALUES (?, ?, ?, ?, 'OPEN', ?, ?)
-                    """, Statement.RETURN_GENERATED_KEYS)) {
-                statement.setString(1, seller.toString());
-                statement.setString(2, itemData);
-                statement.setInt(3, quantity);
-                statement.setLong(4, priceMinor);
-                statement.setLong(5, expiresAt);
-                statement.setLong(6, now);
-                statement.executeUpdate();
-                try (ResultSet result = statement.getGeneratedKeys()) {
-                    return result.next() ? result.getLong(1) : -1;
+                long listingId;
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        INSERT INTO auctions(seller_uuid, item_data, quantity, price_minor, status, expires_at, created_at)
+                        VALUES (?, ?, ?, ?, 'OPEN', ?, ?)
+                        """, Statement.RETURN_GENERATED_KEYS)) {
+                    statement.setString(1, seller.toString());
+                    statement.setString(2, itemData);
+                    statement.setInt(3, quantity);
+                    statement.setLong(4, priceMinor);
+                    statement.setLong(5, expiresAt);
+                    statement.setLong(6, now);
+                    statement.executeUpdate();
+                    try (ResultSet result = statement.getGeneratedKeys()) {
+                        listingId = result.next() ? result.getLong(1) : -1;
+                    }
                 }
+                if (listingId <= 0) {
+                    connection.rollback();
+                    return -1;
+                }
+                if (escrowId != null) {
+                    try (PreparedStatement clear = connection.prepareStatement(
+                            "DELETE FROM item_escrow WHERE id = ?")) {
+                        clear.setString(1, escrowId);
+                        clear.executeUpdate();
+                    }
+                }
+                connection.commit();
+                return listingId;
+            } catch (SQLException | RuntimeException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
             }
         }
     }
@@ -1943,6 +1978,122 @@ public final class FbsmpDatabase implements AutoCloseable {
             try (ResultSet result = statement.executeQuery()) {
                 result.next();
                 return result.getLong(1);
+            }
+        }
+    }
+
+    /**
+     * Records an item the source player has just removed from their inventory,
+     * before the destination (mailbox or auction listing) is written. If the
+     * process dies in between, {@link #recoverItemEscrow(long)} returns the item.
+     */
+    public String createItemEscrow(UUID playerId, String itemData, String escrowType, long now)
+            throws SQLException {
+        if (itemData == null || itemData.isBlank() || escrowType == null || escrowType.isBlank()) {
+            throw new IllegalArgumentException("Escrow record is invalid.");
+        }
+        String id = UUID.randomUUID().toString();
+        synchronized (lock) {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO item_escrow(id, player_uuid, item_data, escrow_type, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """)) {
+                statement.setString(1, id);
+                statement.setString(2, playerId.toString());
+                statement.setString(3, itemData);
+                statement.setString(4, escrowType);
+                statement.setLong(5, now);
+                statement.executeUpdate();
+            }
+        }
+        return id;
+    }
+
+    /**
+     * Moves an escrowed item into {@code recipient}'s mailbox and clears the
+     * escrow row in one transaction, so a crash can never both keep the escrow
+     * and deliver the item. Returns false when the escrow row no longer exists.
+     */
+    public boolean deliverEscrowTo(String escrowId, UUID recipient, long now) throws SQLException {
+        synchronized (lock) {
+            boolean previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try {
+                String itemData;
+                try (PreparedStatement find = connection.prepareStatement(
+                        "SELECT item_data FROM item_escrow WHERE id = ?")) {
+                    find.setString(1, escrowId);
+                    try (ResultSet result = find.executeQuery()) {
+                        if (!result.next()) {
+                            connection.rollback();
+                            return false;
+                        }
+                        itemData = result.getString(1);
+                    }
+                }
+                insertMailbox(recipient, itemData, now);
+                try (PreparedStatement delete = connection.prepareStatement(
+                        "DELETE FROM item_escrow WHERE id = ?")) {
+                    delete.setString(1, escrowId);
+                    delete.executeUpdate();
+                }
+                connection.commit();
+                return true;
+            } catch (SQLException | RuntimeException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
+            }
+        }
+    }
+
+    /** Number of escrow rows still awaiting a destination. Diagnostics/tests. */
+    public int pendingItemEscrowCount() throws SQLException {
+        synchronized (lock) {
+            try (Statement statement = connection.createStatement();
+                 ResultSet result = statement.executeQuery("SELECT COUNT(*) FROM item_escrow")) {
+                return result.next() ? result.getInt(1) : 0;
+            }
+        }
+    }
+
+    /**
+     * Returns every outstanding escrow item to its owner's mailbox. Run once at
+     * startup: a row that survives to here means the process stopped between the
+     * inventory removal and the destination write.
+     */
+    public int recoverItemEscrow(long now) throws SQLException {
+        synchronized (lock) {
+            boolean previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            int recovered = 0;
+            try {
+                List<EscrowRow> rows = new ArrayList<>();
+                try (Statement statement = connection.createStatement();
+                     ResultSet result = statement.executeQuery(
+                             "SELECT id, player_uuid, item_data FROM item_escrow")) {
+                    while (result.next()) {
+                        rows.add(new EscrowRow(result.getString(1),
+                                UUID.fromString(result.getString(2)), result.getString(3)));
+                    }
+                }
+                for (EscrowRow row : rows) {
+                    insertMailbox(row.playerId(), row.itemData(), now);
+                    try (PreparedStatement delete = connection.prepareStatement(
+                            "DELETE FROM item_escrow WHERE id = ?")) {
+                        delete.setString(1, row.id());
+                        delete.executeUpdate();
+                    }
+                    recovered++;
+                }
+                connection.commit();
+                return recovered;
+            } catch (SQLException | RuntimeException exception) {
+                connection.rollback();
+                throw exception;
+            } finally {
+                connection.setAutoCommit(previousAutoCommit);
             }
         }
     }
@@ -3342,4 +3493,5 @@ public final class FbsmpDatabase implements AutoCloseable {
     public record AuditRow(String actorName, String action, String target, String reason, long createdAt) {}
     private record ExpiredOrder(long id, UUID requester, long rewardMinor) {}
     private record ExpiredAuction(long id, UUID seller, String itemData) {}
+    private record EscrowRow(String id, UUID playerId, String itemData) {}
 }

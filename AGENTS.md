@@ -24,6 +24,14 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
 - `writeAudit(actorUuid, actorName, action, target, beforeJson, afterJson, reason, now)`
   records administrative actions in `fbsmp_audit_log`. Every sensitive admin
   action must write an audit row.
+- Item transfers that remove a stack from a player inventory (`/gift <player> item`,
+  `/ausell`) must first record it with `createItemEscrow(...)` (table
+  `item_escrow`, V6). The row is cleared only when the destination is durable:
+  `deliverEscrowTo(...)` (gift -> recipient mail) or `createAuction(..., escrowId)`
+  (listing) clear it in the same transaction as the destination write.
+  `recoverItemEscrow(now)` runs once at startup and returns any surviving row to
+  its owner's mailbox, so a crash can never both keep the escrow and lose the
+  item. Never delete the inventory stack before the escrow row is committed.
 - Economy provider is **custom (SQLite)**, not Vault. There is no Vault dependency.
 
 ## Admin panel

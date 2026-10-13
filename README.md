@@ -52,7 +52,9 @@ Implemented player commands:
 
 The implementation includes server-validated shop and auction purchases, safe mailbox delivery, loan and mortgage ledgers, community orders, persisted moderation, player settings, and server-side GUI controls. The starter kit is one-time, queued through player mail, and contains no weapons.
 
-**Incomplete / not production-ready:** `/gift` currently supports confirmed currency gifts only; item gifts are not implemented. Mortgage offers are disabled until `available-properties` is configured, and mortgage records are financial contracts only: they do not claim land or grant in-world ownership. Auction item recovery across a crash between inventory removal and listing persistence has not been proven safe. Review those paths and test on a staging server before enabling an economy with valuable items or property. The project does not include a land-claiming system.
+`/gift` supports confirmed currency gifts and confirmed item gifts. An item gift moves the held stack into a crash-safe escrow, and on `/gift confirm` it is delivered to the recipient's player mail. An unaccepted, cancelled, or timed-out item gift is returned to the sender by player mail, so no item is lost. Item gifting can be disabled with `gifts.yml` `allow-item-gifts: false` or the `fbsmp.gift.item` permission.
+
+**Not production-ready:** Mortgage offers are disabled until `available-properties` is configured, and mortgage records are financial contracts only: they do not claim land or grant in-world ownership. Review those paths and test on a staging server before enabling an economy with valuable items or property. The project does not include a land-claiming system.
 
 ## Configuration
 

@@ -1,2 +1,6 @@
 confirmation-timeout-seconds: 30
 maximum-currency-gift: 100000.00
+# Item gifts are removed from the sender's inventory into a crash-safe escrow,
+# then delivered to the recipient's player mail once accepted and confirmed.
+# An unaccepted or cancelled item gift is returned to the sender by player mail.
+allow-item-gifts: true

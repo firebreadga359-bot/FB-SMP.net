@@ -59,6 +59,16 @@ public final class FbsmpPlugin extends JavaPlugin {
             return;
         }
 
+        try {
+            int recovered = database.recoverItemEscrow(System.currentTimeMillis());
+            if (recovered > 0) {
+                getLogger().info("Recovered " + recovered + " escrowed item(s) from an unclean shutdown; "
+                        + "they were returned by player mail.");
+            }
+        } catch (SQLException exception) {
+            getLogger().severe("Could not recover item escrow: " + exception.getMessage());
+        }
+
         PlayerListener playerListener = new PlayerListener(this, database);
         new ModerationListener(this, database);
         ShopMenu shopMenu = new ShopMenu(this, database, playerListener);
