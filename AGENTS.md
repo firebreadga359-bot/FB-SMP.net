@@ -133,18 +133,29 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
 
 ## Website (`site/`)
 
-- `site/index.html` is a self-contained static page (no build step): join
-  addresses, feature tour, invite form, an "OpenHands" section linking the repo +
-  `AGENTS.md` + docs, and a **live status** panel.
+- The site is **multi-page and static** (no build step), sharing
+  `site/assets/site.css` (design system) and `site/assets/site.js` (behaviour).
+  Pages: `index.html` (home), `features.html`, `join.html`, `stats.html`,
+  `rules.html`, `faq.html`, `changelog.html`, `signup.html`, `404.html`.
+  Every page repeats the same `<header class="nav">` and `<footer>`; when adding
+  a page, copy those and update all nav lists together.
+- `site.js` is the single source of behaviour: live server status, the
+  control-room address, GitHub commits (`#commit-log`), open issues
+  (`[data-issues]`), uptime issues (`#alert-log`), copy buttons (`[data-copy]`),
+  scroll reveals (`.reveal`), counters (`[data-count]`), the mobile nav, and the
+  invite form. It is keyed off element ids/`data-*` attributes, so a page only
+  opts into a feature by including the matching markup.
 - Live status fetches `https://api.mcstatus.io/v2/status/{java,bedrock}/<host>:<port>`
   in the browser (the API sends `access-control-allow-origin: *`, so no proxy is
   needed). It refreshes every 60s and on a button. Keep the addresses in the
   `JAVA`/`BEDROCK` JS objects in sync with the playit tunnels.
 - The invite form posts JSON to `/_forms/join` and only works on the form hosts
   listed in `FORM_HOSTS` (`fb-smp.birta.link`, `fb-smp.net`, `www.fb-smp.net`);
-  off-host it hides the form and links to the Birta form instead.
+  off-host it hides the form card and reveals `#signup-fallback`, which points at
+  a GitHub issue instead. Without this, submitting off-host would just reload the
+  page — the handler must stay.
 - Published to GitHub Pages by `.github/workflows/pages.yml` on pushes to `main`
-  under `site/`. `site/CNAME` = `fb-smp.net`. The repo root is a Minecraft
+  under `site/`. The repo root is a Minecraft
   server, so only `site/` is uploaded.
 - **Custom-domain DNS is not pointed at GitHub yet.** The site is live at
   `https://firebreadga359-bot.github.io/FB-SMP.net/`. `fb-smp.net` (and `www`)
