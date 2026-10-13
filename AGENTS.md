@@ -178,6 +178,30 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   zone then activates, the records above go live, and GitHub issues the
   certificate.
 
+## Hosting (Birta)
+
+- The site is also hosted on **Birta** (AI-built landing-page hosting) at
+  `https://fb-smp.birta.link`. Project address is `fb-smp`; the owner account is
+  `firebread.ga.359@gmail.com`. This is the address the invite form's
+  `FORM_HOSTS` expects, so the form works here.
+- Connect over stdio with `npx -y @birta/cli mcp` (needs Node >= 20). The first
+  protected request returns a confirmation link the owner must open; after that
+  the connection holds its own access. Tools: `upload_draft` (from a folder on
+  this machine), `publish_version`, `list_versions`, `connect_domain`,
+  `verify_domain`, `create_form`, `list_leads`, and more.
+- Publish flow: `upload_draft` puts the folder into the project's DRAFT (a new
+  version number each time), then `publish_version` makes it live. Upload
+  `site/` (the site has no build step, so `dir` is the site folder and no
+  `site_root` is needed). Publishing does not touch the domain.
+- **Custom domain needs the Solo plan ($12/mo).** On Free, `connect_domain` is
+  refused: "The Free plan does not include a domain of your own." Free keeps the
+  `fb-smp.birta.link` address, 25 MB/project, and 10 form requests/month. Solo
+  adds the custom domain and allows hiding the "Made with Birta" line.
+- Because Free cannot take the custom domain, `fb-smp.net` is currently wired to
+  **GitHub Pages** instead (see the Website section). Both hosts are live; only
+  the custom domain is unresolved, and that is blocked on the registrar
+  nameservers.
+
 ## 24/7 host (GitHub Codespace)
 
 - The live host is the codespace `fb-smp-24h-4qv59g697vjwcgjx` (owner
