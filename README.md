@@ -61,9 +61,17 @@ The implementation includes server-validated shop and auction purchases, safe ma
 `site/` is a static public page for players: join addresses for Java and Bedrock, a
 short feature tour, an invite form, and a **live status** panel that reads the public
 addresses from `api.mcstatus.io` (a third party, CORS-enabled) and shows whether each
-edition is online and how many players are on. It is published to GitHub Pages by
-`.github/workflows/pages.yml` on every change under `site/`, with `site/CNAME`
-mapping it to `fb-smp.net`. No build step and no server are required.
+edition is online and how many players are on. No build step and no server are required.
+
+**Live at <https://firebreadga359-bot.github.io/FB-SMP.net/>** (the path is
+case-sensitive: `FB-SMP.net`, not `fb-smp.net`). Published to GitHub Pages by
+`.github/workflows/pages.yml` on every change under `site/`.
+
+The `fb-smp.net` custom domain is not live yet: its DNS still points at a GoDaddy
+website builder. Move the apex A records to the GitHub Pages IPs
+(`185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`) and
+point `www` at `firebreadga359-bot.github.io`, then re-add `site/CNAME` with
+`fb-smp.net`.
 
 The page also points visitors at the source repository and the project notes so they
 can read how the server is built and operated with OpenHands.
