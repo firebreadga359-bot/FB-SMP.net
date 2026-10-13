@@ -157,14 +157,26 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
 - Published to GitHub Pages by `.github/workflows/pages.yml` on pushes to `main`
   under `site/`. The repo root is a Minecraft
   server, so only `site/` is uploaded.
-- **Custom-domain DNS is not pointed at GitHub yet.** The site is live at
-  `https://firebreadga359-bot.github.io/FB-SMP.net/`. `fb-smp.net` (and `www`)
-  still resolve to a GoDaddy website builder (GoDaddy IPs `76.223.105.230`,
-  `13.248.243.5`, `199.115.72.77`), so the custom domain serves the old host,
-  not the repo page. Fix at the registrar: set the apex A records to
-  `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
-  and a `www` CNAME to `firebreadga359-bot.github.io`, then "Verify" the domain
-  in repo Settings -> Pages. Pages already has `cname: fb-smp.net` configured.
+- **Custom domain is set up but not live yet.** `fb-smp.net` is added as a
+  Cloudflare zone (`d1b9402fa02ced63a5189317b274fd7f`), which is still
+  **pending**: the registrar still serves GoDaddy nameservers
+  (`ns75/ns76.domaincontrol.com`) instead of the assigned
+  `nicole.ns.cloudflare.com` / `todd.ns.cloudflare.com`. Until those are
+  changed, the public apex keeps answering from GoDaddy's website builder and
+  the custom domain serves the old host.
+- The Cloudflare zone already holds the correct records for after the cutover:
+  apex `A` to the four GitHub Pages IPs (`185.199.108-111.153`, **DNS-only** so
+  GitHub's own TLS is used — proxying without Full SSL would loop), `www` CNAME
+  to `firebreadga359-bot.github.io` (DNS-only), and `panel.fb-smp.net` CNAME to
+  the named tunnel (proxied). The old GoDaddy-builder apex records were deleted.
+  Rebuild with the Cloudflare API if they drift.
+- GitHub Pages is configured with `cname: fb-smp.net` (via
+  `PUT /repos/{owner}/{repo}/pages`), and `https_enforced` is off until the
+  certificate is issued. Pages serves the site today at
+  `https://firebreadga359-bot.github.io/FB-SMP.net/`.
+- To finish: change the registrar's nameservers to the two Cloudflare ones. The
+  zone then activates, the records above go live, and GitHub issues the
+  certificate.
 
 ## 24/7 host (GitHub Codespace)
 
