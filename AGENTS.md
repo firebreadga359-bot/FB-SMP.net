@@ -146,6 +146,36 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
 - Published to GitHub Pages by `.github/workflows/pages.yml` on pushes to `main`
   under `site/`. `site/CNAME` = `fb-smp.net`. The repo root is a Minecraft
   server, so only `site/` is uploaded.
+- **Custom-domain DNS is not pointed at GitHub yet.** The site is live at
+  `https://firebreadga359-bot.github.io/FB-SMP.net/`. `fb-smp.net` (and `www`)
+  still resolve to a GoDaddy website builder (GoDaddy IPs `76.223.105.230`,
+  `13.248.243.5`, `199.115.72.77`), so the custom domain serves the old host,
+  not the repo page. Fix at the registrar: set the apex A records to
+  `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
+  and a `www` CNAME to `firebreadga359-bot.github.io`, then "Verify" the domain
+  in repo Settings -> Pages. Pages already has `cname: fb-smp.net` configured.
+
+## 24/7 host (GitHub Codespace)
+
+- The live host is the codespace `fb-smp-24h-4qv59g697vjwcgjx` (owner
+  `firebreadga359-bot`). The server runs from `/workspaces/fb-smp/server`;
+  data (world, `plugins/FBSMP/fbsmp.sqlite`) lives there and survives restarts.
+- Processes are managed by `/workspaces/fbsmp-keeper.sh` (detached) -> it starts
+  and revives `/workspaces/supervise.sh`, `panel_bridge.py`, `fbsmp-health.sh`,
+  and playit. `.bashrc` relaunches the keeper on an interactive shell.
+- `.github/workflows/codespace-keepalive.yml` (needs
+  `CODESPACE_KEEPALIVE_TOKEN`) starts the codespace, SSHes in, starts the keeper
+  if missing, and restarts playit when a tunnel is down. It runs every 15 min.
+- There is **no init/systemd** in a codespace, so after the host is stopped for
+  inactivity and resumed, everything is gone until either the next keep-alive
+  run or an interactive shell starts the keeper. A non-interactive `gh codespace
+  ssh` does **not** run `.bashrc`, so it will not revive the keeper by itself.
+- To revive by hand: clear stale `keeper.lock`/`supervise.lock`, then
+  `setsid nohup /workspaces/fbsmp-keeper.sh >>/workspaces/keeper.log 2>&1 </dev/null &`.
+  The keeper rebuilds `logs/` and restarts the stack. Detached processes survive
+  an SSH disconnect. Never `pkill -f paper.jar` from a command line that itself
+  contains that string, or you kill your own SSH session.
+- For a real always-on host, use the VPS path in `deploy/ALWAYS-ON.md`.
 
 ## Running it 24/7
 
