@@ -54,9 +54,22 @@ jobs:
         if: ${{ env.GH_TOKEN != '' }}
         run: |
           gh codespace ssh -c "$CS" -- 'echo alive' || true
-          if ! gh codespace ssh -c "$CS" -- 'pgrep -f fbsmp-keeper.sh >/dev/null'; then
-            gh codespace ssh -c "$CS" -- 'setsid nohup /workspaces/fbsmp-keeper.sh >>/workspaces/keeper.log 2>&1 </dev/null & sleep 4; pgrep -cf fbsmp-keeper.sh' || true
-          fi
+          # A resumed codespace has no init system, so nothing survives a stop.
+          # The previous keeper can be gone with a stale pid file left behind,
+          # and a non-interactive ssh does not run .bashrc. Always clear the
+          # stale locks and relaunch the keeper so it reboots the whole stack.
+          gh codespace ssh -c "$CS" -- '
+            if pgrep -f fbsmp-keeper.sh >/dev/null; then
+              echo "keeper already running"
+            else
+              cd /workspaces || exit 0
+              pgrep -f fbsmp-keeper.sh >/dev/null && exit 0
+              rm -f keeper.lock supervise.lock
+              setsid nohup ./fbsmp-keeper.sh >>keeper.log 2>&1 </dev/null &
+              sleep 4
+              echo "keeper pids: $(pgrep -cf fbsmp-keeper.sh)"
+            fi
+          ' || true
 
       - name: Ensure admin panel port is public and bridge is up
         if: ${{ env.GH_TOKEN != '' }}
