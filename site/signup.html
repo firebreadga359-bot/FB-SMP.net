@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign up — FB-SMP</title>
+<meta name="description" content="Request an invite to FB-SMP. Leave your details and get the join information for Java or Bedrock.">
+<meta name="theme-color" content="#0a0e0b">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%237bd44a'/></svg>">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="cube"></span> FB-SMP</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <nav class="nav-links" id="nav-links">
+      <a href="features.html">Features</a>
+      <a href="join.html">Join</a>
+      <a href="stats.html">Status</a>
+      <a href="rules.html">Rules</a>
+      <a href="faq.html">FAQ</a>
+      <a href="changelog.html">Changelog</a>
+      <a href="signup.html">Sign up</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <p class="kicker">Get an invite</p>
+    <h1>Ask to join<br><span class="grad">the world</span></h1>
+    <p class="lede">Access is invite-based so the world stays a known community. Leave your
+      details and we will reply with the join information and whitelist you.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="grid two" style="align-items:start">
+      <div class="form-card">
+        <form id="join-form" novalidate>
+          <div class="field">
+            <label for="f-name">Name or gamertag</label>
+            <input id="f-name" name="name" type="text" maxlength="500" required autocomplete="nickname">
+          </div>
+          <div class="field">
+            <label for="f-email">Email</label>
+            <input id="f-email" name="email" type="email" maxlength="254" required autocomplete="email">
+          </div>
+          <div class="field">
+            <label for="f-platform">Platform</label>
+            <select id="f-platform" name="platform" required>
+              <option value="">Choose one…</option>
+              <option value="java">Java</option>
+              <option value="bedrock">Bedrock</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-message">Tell us about yourself <span class="note">(optional)</span></label>
+            <textarea id="f-message" name="message" maxlength="5000"></textarea>
+          </div>
+          <div class="field check">
+            <input id="f-consent" name="consent" type="checkbox" required>
+            <label for="f-consent">Yes, you may reply to me about joining FB-SMP.</label>
+          </div>
+          <button class="btn primary" type="submit" id="submit-btn">Send my request</button>
+          <div class="status-msg" id="form-status" role="status" aria-live="polite"></div>
+          <p class="note" style="margin-top:12px">Submissions are read by the server owners and
+            used only to reply about the server. Please do not include sensitive information.</p>
+        </form>
+      </div>
+
+      <div class="form-card" id="signup-fallback" hidden>
+        <h3 style="margin-top:0">Request an invite another way</h3>
+        <p class="note">The sign-up form is handled by the server host, which is not reachable
+          from this address. Open an issue in the project repository with the label
+          <code>invite</code> and we will reply there — or use the form on the live server site.</p>
+        <div class="cta" style="margin-top:16px">
+          <a class="btn primary" href="https://github.com/firebreadga359-bot/FB-SMP.net/issues/new" rel="noopener">Open an invite request</a>
+          <a class="btn ghost" href="https://fb-smp.birta.link/#signup">Open the live form</a>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="tagline">What happens next</div>
+          <h3>You get the join details</h3>
+          <p>We reply with the addresses for your platform and add you to the whitelist. Then
+            follow the <a href="join.html">join guide</a> — it takes about a minute.</p>
+        </div>
+        <div class="card">
+          <div class="tagline">Before you apply</div>
+          <h3>Read the rules</h3>
+          <p>Two minutes of reading saves everyone time. Griefing, cheating, and stealing are
+            the things that get people removed.</p>
+          <div class="cta" style="margin-top:14px">
+            <a class="btn ghost" href="rules.html">The rules</a>
+          </div>
+        </div>
+        <div class="card">
+          <div class="tagline">Prefer GitHub?</div>
+          <h3>Open an issue instead</h3>
+          <p>If you would rather not share an email, open an issue in the repository with the
+            label <code>invite</code> and we will reply there.</p>
+          <div class="cta" style="margin-top:14px">
+            <a class="btn ghost" href="https://github.com/firebreadga359-bot/FB-SMP.net/issues/new" rel="noopener">Open an issue</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <div class="brand" style="margin-bottom:10px"><span class="cube"></span> FB-SMP</div>
+        <p class="note" style="max-width:34ch">A community survival world for Java and Bedrock,
+          online around the clock.</p>
+      </div>
+      <div><h4>Play</h4><a href="join.html">How to join</a><a href="rules.html">Rules</a><a href="signup.html">Sign up</a></div>
+      <div><h4>Explore</h4><a href="features.html">Features</a><a href="stats.html">Status &amp; uptime</a><a href="faq.html">FAQ</a></div>
+      <div><h4>Project</h4><a href="changelog.html">Changelog</a><a href="https://github.com/firebreadga359-bot/FB-SMP.net" rel="noopener">GitHub</a><a href="https://docs.openhands.dev/" rel="noopener">OpenHands</a></div>
+    </div>
+    <div class="foot-bottom">
+      <span>FB-SMP — a community survival world.</span>
+      <span>Java &amp; Bedrock · Geyser · 24/7 · <span data-year></span></span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

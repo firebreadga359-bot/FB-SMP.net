@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features — FB-SMP</title>
+<meta name="description" content="Everything FB-SMP does: a player economy, land claims, crossplay for Java and Bedrock, self-healing infrastructure, moderation, and a live control room.">
+<meta name="theme-color" content="#0a0e0b">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%237bd44a'/></svg>">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="cube"></span> FB-SMP</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <nav class="nav-links" id="nav-links">
+      <a href="features.html">Features</a>
+      <a href="join.html">Join</a>
+      <a href="stats.html">Status</a>
+      <a href="rules.html">Rules</a>
+      <a href="faq.html">FAQ</a>
+      <a href="changelog.html">Changelog</a>
+      <a href="signup.html">Sign up</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <p class="kicker">Feature index</p>
+    <h1>Everything the world<br><span class="grad">actually does</span></h1>
+    <p class="lede">A survival server is more than a world file. These are the systems that
+      make FB-SMP worth returning to — grouped by what they do for you.</p>
+    <div class="grid cards" style="margin-top:8px">
+      <div class="card"><div class="tagline">Reliability</div>
+        <div class="big"><span data-count="24" data-suffix="/7">0/7</span></div>
+        <p>Restarts, watchdogs, and health checks keep the world reachable.</p></div>
+      <div class="card"><div class="tagline">Editions</div>
+        <div class="big">2 → 1</div>
+        <p>Java and Bedrock converge on a single shared world.</p></div>
+      <div class="card"><div class="tagline">Economy</div>
+        <div class="big">Shops</div>
+        <p>Chest shops, an auction house, and loans between players.</p></div>
+      <div class="card"><div class="tagline">Monitoring</div>
+        <div class="big"><span data-count="5">0</span> min</div>
+        <p>External checks raise an alert the moment something is down.</p></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">01 · Gameplay</p>
+    <h2>Systems that give the world a pulse</h2>
+    <p class="sub">Enough structure to make progress matter, without turning survival into a job.</p>
+    <div class="grid cards">
+      <div class="card big-card"><span class="ico">🛒</span><h3>Player economy</h3>
+        <p>An in-game currency that circulates between players, not into a shop menu.
+          Open a chest shop, price your goods, and let the market decide. Balances persist
+          across restarts and are visible in the control room.</p></div>
+      <div class="card"><span class="ico">🔨</span><h3>Auction house</h3>
+        <p>List rare items and bid against other players. Good for enchanted gear,
+          bulk materials, and anything a chest shop is too clunky for.</p></div>
+      <div class="card"><span class="ico">🏦</span><h3>Loans &amp; interest</h3>
+        <p>Short on capital for a big build? Borrow against future earnings and repay
+          on a schedule. Keeps ambitious projects from stalling.</p></div>
+      <div class="card"><span class="ico">🏘️</span><h3>Towns &amp; claims</h3>
+        <p>Found a town, invite members, and claim the land around it. Claims are
+          protected automatically — no command gymnastics required.</p></div>
+      <div class="card"><span class="ico">⛏️</span><h3>Progression</h3>
+        <p>Playtime and milestones unlock cosmetics and perks. Nothing pay-to-win —
+          everything is earned in the world.</p></div>
+      <div class="card"><span class="ico">🎣</span><h3>Custom content</h3>
+        <p>Server-only items, recipes, and world events that make this world different
+          from every other survival map.</p></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">02 · Crossplay</p>
+    <h2>Everyone in the same world</h2>
+    <p class="sub">Geyser and Floodgate translate Bedrock clients into the Java server, so
+      there is one world, one economy, and one chat — not two parallel servers.</p>
+    <div class="grid two">
+      <div class="card"><div class="tagline">Java</div><h3>Desktop, macOS, Linux</h3>
+        <div class="addr"><code id="java-addr">cairo-paste.tun.ply.gg:25565</code>
+          <button class="mini-btn" data-copy="java-addr" type="button">Copy</button></div>
+        <p class="note" style="margin-top:12px">Works with vanilla, OptiFine, Fabric, and most mods
+          that don't change world generation.</p></div>
+      <div class="card"><div class="tagline">Bedrock</div><h3>Phone, console, Windows</h3>
+        <div class="addr"><code id="bedrock-addr">fried-toilette.tun.ply.gg:37298</code>
+          <button class="mini-btn" data-copy="bedrock-addr" type="button">Copy</button></div>
+        <p class="note" style="margin-top:12px">iOS, Android, Xbox, PlayStation, Switch, and the
+          Windows Bedrock app all connect with the same address.</p></div>
+    </div>
+    <div class="banner" style="margin-top:22px">
+      Both editions share inventory-free survival: your progress, claims, and money follow
+      your account, so you can switch devices without losing your place.
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">03 · Reliability</p>
+    <h2>Infrastructure you never have to think about</h2>
+    <p class="sub">The part players only notice when it breaks — so it is built not to.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>System</th><th>What it does</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><b>Watchdog</b></td><td>Restarts any component that stops responding</td><td><code>seconds of downtime</code></td></tr>
+          <tr><td><b>Keep-alive</b></td><td>Re-opens the play tunnels and panel link on a schedule</td><td><code>addresses stay live</code></td></tr>
+          <tr><td><b>Health checks</b></td><td>External probes of Java, Bedrock, and the panel</td><td><code>alert within 5 min</code></td></tr>
+          <tr><td><b>Scheduled restarts</b></td><td>Clean restarts during quiet hours</td><td><code>stable memory</code></td></tr>
+          <tr><td><b>Backups</b></td><td>The world is copied off the host regularly</td><td><code>recoverable</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cta" style="margin-top:22px">
+      <a class="btn ghost" href="stats.html">See the live status and outage history</a>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">04 · Tools</p>
+    <h2>Built for the people running it</h2>
+    <p class="sub">Owners get a real operations surface instead of squinting at a console log.</p>
+    <div class="grid cards">
+      <div class="card big-card"><span class="ico">🎛️</span><h3>Control room</h3>
+        <p>A password-protected web panel that shows who is online, world state, and the
+          economy at a glance. It sits behind its own login with per-session CSRF protection
+          and rate limiting, and its public address is refreshed automatically.</p>
+        <div class="cta" style="margin-top:14px">
+          <a class="btn primary" data-panel-link id="panel-link"
+             href="https://github.com/firebreadga359-bot/FB-SMP.net" rel="noopener">Open the control room</a>
+        </div>
+        <p class="note" id="panel-status" style="margin-top:10px">Resolving the control-room address…</p>
+      </div>
+      <div class="card"><span class="ico">📊</span><h3>Public status</h3>
+        <p>Uptime and player counts anyone can check without logging in.</p></div>
+      <div class="card"><span class="ico">📜</span><h3>Changelog</h3>
+        <p>Every change to the server and site, pulled straight from the repository.</p></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">05 · Fair play</p>
+    <h2>Rules with teeth</h2>
+    <p class="sub">Moderation that is consistent, logged, and open to appeal.</p>
+    <div class="grid cards">
+      <div class="card"><span class="ico">🛡️</span><h3>Anti-cheat</h3>
+        <p>Movement, combat, and inventory checks flag impossible behaviour for review.</p></div>
+      <div class="card"><span class="ico">↩️</span><h3>Rollback</h3>
+        <p>Griefed builds can be restored from block history, sometimes without a restart.</p></div>
+      <div class="card"><span class="ico">⚖️</span><h3>Appeals</h3>
+        <p>Every action is logged, and there is a clear path to appeal a decision.</p></div>
+      <div class="card"><span class="ico">🧑‍⚖️</span><h3>Real people</h3>
+        <p>Decisions are made by the owners, not an opaque automatic system.</p></div>
+    </div>
+    <div class="cta" style="margin-top:22px">
+      <a class="btn primary" href="rules.html">Read the rules</a>
+      <a class="btn ghost" href="signup.html">Sign up to play</a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <div class="brand" style="margin-bottom:10px"><span class="cube"></span> FB-SMP</div>
+        <p class="note" style="max-width:34ch">A community survival world for Java and Bedrock,
+          online around the clock.</p>
+      </div>
+      <div><h4>Play</h4><a href="join.html">How to join</a><a href="rules.html">Rules</a><a href="signup.html">Sign up</a></div>
+      <div><h4>Explore</h4><a href="features.html">Features</a><a href="stats.html">Status &amp; uptime</a><a href="faq.html">FAQ</a></div>
+      <div><h4>Project</h4><a href="changelog.html">Changelog</a><a href="https://github.com/firebreadga359-bot/FB-SMP.net" rel="noopener">GitHub</a><a href="https://docs.openhands.dev/" rel="noopener">OpenHands</a></div>
+    </div>
+    <div class="foot-bottom">
+      <span>FB-SMP — a community survival world.</span>
+      <span>Java &amp; Bedrock · Geyser · 24/7 · <span data-year></span></span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

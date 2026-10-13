@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status &amp; uptime — FB-SMP</title>
+<meta name="description" content="Live FB-SMP server status for Java and Bedrock, the outage history recorded by the uptime checker, and how monitoring works.">
+<meta name="theme-color" content="#0a0e0b">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%237bd44a'/></svg>">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html"><span class="cube"></span> FB-SMP</a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <nav class="nav-links" id="nav-links">
+      <a href="features.html">Features</a>
+      <a href="join.html">Join</a>
+      <a href="stats.html">Status</a>
+      <a href="rules.html">Rules</a>
+      <a href="faq.html">FAQ</a>
+      <a href="changelog.html">Changelog</a>
+      <a href="signup.html">Sign up</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero">
+    <p class="kicker">Observability</p>
+    <h1>Is it up?<br><span class="grad">Check here.</span></h1>
+    <p class="lede">Two independent views: what a player would see right now, and the record
+      of every outage the automated checker has caught.</p>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">Right now</p>
+    <h2>Live status</h2>
+    <p class="sub">Polled from a third-party status API, refreshed every minute.</p>
+    <div class="grid status-grid">
+      <div class="stat" id="java-stat">
+        <div class="stat-head"><h3>Java Edition</h3>
+          <span class="state" id="java-state"><span class="dot" id="java-dot"></span> Checking…</span></div>
+        <div class="big" id="java-players">—<small> players online</small></div>
+        <div class="bar"><i id="java-bar"></i></div>
+        <div class="meta">
+          <span>Version <b id="java-version">—</b></span>
+          <span>Address <b>cairo-paste.tun.ply.gg:25565</b></span>
+        </div>
+      </div>
+      <div class="stat" id="bedrock-stat">
+        <div class="stat-head"><h3>Bedrock Edition</h3>
+          <span class="state" id="bedrock-state"><span class="dot" id="bedrock-dot"></span> Checking…</span></div>
+        <div class="big" id="bedrock-players">—<small> players online</small></div>
+        <div class="bar"><i id="bedrock-bar"></i></div>
+        <div class="meta">
+          <span>Version <b id="bedrock-version">—</b></span>
+          <span>Address <b>fried-toilette.tun.ply.gg:37298</b></span>
+        </div>
+      </div>
+    </div>
+    <div class="status-foot">
+      <button class="mini-btn" id="refresh-btn" type="button">Refresh now</button>
+      <span id="checked-at">Last checked: —</span>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">Track record</p>
+    <h2>Outage history</h2>
+    <p class="sub">A scheduled check runs every five minutes against Java, Bedrock, and the
+      control room. When something is unreachable it opens a tracked incident; when it recovers,
+      the incident closes itself.</p>
+    <div class="grid cards" style="margin-bottom:24px">
+      <div class="card"><div class="tagline">Check interval</div><div class="big"><span data-count="5">0</span> min</div>
+        <p>How often the external probes run.</p></div>
+      <div class="card"><div class="tagline">Endpoints</div><div class="big">3</div>
+        <p>Java, Bedrock, and the admin panel are all watched.</p></div>
+      <div class="card"><div class="tagline">Response</div><div class="big">Auto</div>
+        <p>Incidents open and close without anyone watching the dashboard.</p></div>
+      <div class="card"><div class="tagline">Open issues</div><div class="big"><span data-issues>—</span></div>
+        <p>Anything currently unresolved in the repository.</p></div>
+    </div>
+    <div class="log" id="alert-log">
+      <p class="note">Loading outage history…</p>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">How it works</p>
+    <h2>What is actually being watched</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Endpoint</th><th>Method</th><th>Alerts on</th></tr></thead>
+        <tbody>
+          <tr><td>Java server</td><td>Status ping from a third party</td><td>No response or malformed handshake</td></tr>
+          <tr><td>Bedrock server</td><td>Bedrock status ping</td><td>No response</td></tr>
+          <tr><td>Control room</td><td>HTTPS request</td><td>Non-200 or timeout</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="banner" style="margin-top:22px">
+      Alerts are deliberately external. A host that reports itself healthy while being
+      unreachable to players is the failure mode this avoids.
+    </div>
+  </section>
+
+  <section class="reveal">
+    <p class="kicker">For owners</p>
+    <h2>Control room</h2>
+    <p class="sub">The operations console, with its address refreshed automatically.</p>
+    <div class="cta">
+      <a class="btn primary" data-panel-link id="panel-link"
+         href="https://github.com/firebreadga359-bot/FB-SMP.net" rel="noopener">Open the control room</a>
+    </div>
+    <p class="status-foot" id="panel-status" style="margin-top:12px">Resolving the control-room address…</p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <div class="brand" style="margin-bottom:10px"><span class="cube"></span> FB-SMP</div>
+        <p class="note" style="max-width:34ch">A community survival world for Java and Bedrock,
+          online around the clock.</p>
+      </div>
+      <div><h4>Play</h4><a href="join.html">How to join</a><a href="rules.html">Rules</a><a href="signup.html">Sign up</a></div>
+      <div><h4>Explore</h4><a href="features.html">Features</a><a href="stats.html">Status &amp; uptime</a><a href="faq.html">FAQ</a></div>
+      <div><h4>Project</h4><a href="changelog.html">Changelog</a><a href="https://github.com/firebreadga359-bot/FB-SMP.net" rel="noopener">GitHub</a><a href="https://docs.openhands.dev/" rel="noopener">OpenHands</a></div>
+    </div>
+    <div class="foot-bottom">
+      <span>FB-SMP — a community survival world.</span>
+      <span>Java &amp; Bedrock · Geyser · 24/7 · <span data-year></span></span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>
