@@ -165,7 +165,20 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   and playit. `.bashrc` relaunches the keeper on an interactive shell.
 - `.github/workflows/codespace-keepalive.yml` (needs
   `CODESPACE_KEEPALIVE_TOKEN`) starts the codespace, SSHes in, starts the keeper
-  if missing, and restarts playit when a tunnel is down. It runs every 15 min.
+  if missing, ensures the public panel tunnel, and restarts playit when a tunnel
+  is down. It runs every 15 min.
+- **The `...-12000.app.github.dev` panel URL does not work.** Codespaces
+  publishes forwarded ports through the `codespaces vmagent` systemd service,
+  and a codespace is a container with no systemd, so the agent crashes on start
+  (`Unable to resolve service for type ...ICurrentMetrics`) and GitHub's tunnel
+  service never learns about port 12000 (`gh codespace ports` returns 404).
+  Only connecting the VS Code web UI starts it. Instead the loopback panel is
+  published by `deploy/fbsmp-panel-tunnel.sh`, a Cloudflare quick tunnel
+  (`cloudflared` in `/workspaces`) that needs no init system. The keeper and the
+  keep-alive workflow both ensure it. The current public URL is written to
+  `/workspaces/panel-url.txt` (a quick-tunnel hostname, so it changes whenever
+  the tunnel restarts; use a named tunnel on a real domain for a stable address).
+  The panel keeps its own login, per-session CSRF, and rate limiting.
 - There is **no init/systemd** in a codespace, so after the host is stopped for
   inactivity and resumed, everything is gone until either the next keep-alive
   run or an interactive shell starts the keeper. A non-interactive `gh codespace
