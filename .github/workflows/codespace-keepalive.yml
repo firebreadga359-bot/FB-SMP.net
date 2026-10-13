@@ -21,6 +21,9 @@ concurrency:
   group: codespace-keepalive
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   keepalive:
     runs-on: ubuntu-latest
@@ -87,16 +90,22 @@ jobs:
           # A Codespaces container has no systemd, so the platform's own port
           # forwarding never starts. Publish the panel through a Cloudflare
           # quick tunnel instead; it survives without an init system.
-          gh codespace ssh -c "$CS" -- '
+          url="$(gh codespace ssh -c "$CS" -- '
             cd /workspaces || exit 0
             if [ ! -x ./cloudflared ]; then
               curl -sL -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && chmod +x cloudflared
             fi
-            if [ -x ./fbsmp-panel-tunnel.sh ]; then
-              ./fbsmp-panel-tunnel.sh
-              echo "panel URL: $(cat panel-url.txt 2>/dev/null)"
-            fi
-          ' || true
+            if [ -x ./fbsmp-panel-tunnel.sh ]; then ./fbsmp-panel-tunnel.sh; cat panel-url.txt 2>/dev/null; fi
+          ' 2>/dev/null | tr -d "\r" | grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" | tail -1 || true)"
+          echo "panel URL: $url"
+          if [ -n "$url" ] && [ "$url" != "$(cat panel-url.txt 2>/dev/null)" ]; then
+            printf '%s\n' "$url" > panel-url.txt
+            git config user.name openhands
+            git config user.email openhands@all-hands.dev
+            git add panel-url.txt
+            git commit -m "Update control-room address" || true
+            git push || true
+          fi
 
       - name: Restart playit if a tunnel is down
         if: ${{ env.GH_TOKEN != '' }}

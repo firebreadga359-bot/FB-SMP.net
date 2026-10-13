@@ -1,0 +1,55 @@
+name: Uptime alert
+
+# Checks the public game addresses and the admin panel every 5 minutes and opens
+# a labelled issue when something is unreachable, then closes it on recovery.
+# Free and self-contained: it uses only the workflow token and gh.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: uptime-alert
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      JAVA_ADDR: cairo-paste.tun.ply.gg:25565
+      BEDROCK_ADDR: fried-toilette.tun.ply.gg:37298
+      CODESPACE: fb-smp-24h-4qv59g697vjwcgjx
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gh
+        run: |
+          sudo apt-get update -y >/dev/null
+          sudo apt-get install -y gh >/dev/null
+
+      - name: Ensure label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh label create uptime --repo "$GITHUB_REPOSITORY" --color B60205 --description "Automated uptime alert" 2>/dev/null || true
+
+      - name: Resolve panel URL
+        id: panel
+        env:
+          GH_TOKEN: ${{ secrets.CODESPACE_KEEPALIVE_TOKEN }}
+        run: |
+          url="${{ vars.FBSMP_PANEL_URL }}"
+          if [ -z "$url" ] && [ -n "$GH_TOKEN" ]; then
+            url="$(gh codespace ssh -c "$CODESPACE" -- 'cat /workspaces/panel-url.txt 2>/dev/null' 2>/dev/null | tr -d '\r\n' || true)"
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Check endpoints
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PANEL_URL: ${{ steps.panel.outputs.url }}
+        run: bash deploy/uptime-alert/check.sh
