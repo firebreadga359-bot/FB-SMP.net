@@ -33,6 +33,9 @@ jobs:
       JAVA_ADDR: cairo-paste.tun.ply.gg:25565
       BEDROCK_ADDR: fried-toilette.tun.ply.gg:37298
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Skip when no codespace token is configured
         if: ${{ env.GH_TOKEN == '' }}
         run: echo "CODESPACE_KEEPALIVE_TOKEN not set; skipping."
