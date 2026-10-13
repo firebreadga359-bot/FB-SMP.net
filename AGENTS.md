@@ -179,6 +179,16 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
   `/workspaces/panel-url.txt` (a quick-tunnel hostname, so it changes whenever
   the tunnel restarts; use a named tunnel on a real domain for a stable address).
   The panel keeps its own login, per-session CSRF, and rate limiting.
+- `.github/workflows/uptime-alert.yml` checks the public Java, Bedrock, and panel
+  endpoints every 5 min and opens an issue labelled `uptime` when one is
+  unreachable, closing it on recovery (`deploy/uptime-alert/check.sh`). It needs
+  no extra secret: the workflow token and `gh`. There is also a Discord/Slack
+  webhook option in `deploy/uptime-alert/` and `fbsmp-health.sh`
+  (`FBSMP_ALERT_WEBHOOK`).
+- The keep-alive run writes the current tunnel URL to `panel-url.txt` on `main`;
+  `site/index.html` reads that file so the landing page always links to the live
+  control room. A quick-tunnel hostname changes on every restart, so the URL is
+  not fixed; a stable name needs a Cloudflare named tunnel or a serveo key.
 - There is **no init/systemd** in a codespace, so after the host is stopped for
   inactivity and resumed, everything is gone until either the next keep-alive
   run or an interactive shell starts the keeper. A non-interactive `gh codespace
