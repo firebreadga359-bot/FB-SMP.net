@@ -6,11 +6,13 @@ package net.firebreadmc.fbsmp.common.shop;
  */
 public enum ItemCategory {
     BUILDING("Building"),
-    FARMING("Farming"),
-    MINING("Mining"),
     DECORATION("Decoration"),
     UTILITY("Utility"),
+    FARMING("Farming"),
     FOOD("Food"),
+    MINING("Mining"),
+    ARMOR("Armor"),
+    WEAPONS("Weapons"),
     MISC("Miscellaneous"),
     RESTRICTED("Restricted");
 

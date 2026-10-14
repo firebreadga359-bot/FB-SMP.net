@@ -12,7 +12,6 @@ class ItemClassifierTest {
         assertTrue(ItemClassifier.isRestricted("barrier"));
         assertTrue(ItemClassifier.isRestricted("command_block"));
         assertTrue(ItemClassifier.isRestricted("dragon_egg"));
-        assertTrue(ItemClassifier.isRestricted("tnt"));
         assertTrue(ItemClassifier.isRestricted("zombie_spawn_egg"));
         assertTrue(ItemClassifier.isRestricted("player_head"));
         assertTrue(ItemClassifier.isRestricted("infested_stone"));
@@ -20,6 +19,15 @@ class ItemClassifierTest {
         assertTrue(ItemClassifier.isRestricted("minecraft:cave_air"));
         assertFalse(ItemClassifier.isRestricted("stone"));
         assertFalse(ItemClassifier.isRestricted("diamond"));
+    }
+
+    @Test
+    void shopPricedItemsAreNotRestricted() {
+        for (String id : new String[]{"tnt", "tnt_minecart", "end_crystal", "lava_bucket",
+                "respawn_anchor", "filled_map", "dragon_head", "piglin_head",
+                "skeleton_skull", "zombie_head", "creeper_head", "wither_skeleton_skull"}) {
+            assertFalse(ItemClassifier.isRestricted(id), id);
+        }
     }
 
     @Test
