@@ -267,9 +267,21 @@ auction house, mortgages, orders, homes, warps, moderation) lives in the
 
 - Prices live in `plugins/FBSMP/shop.yml` (buy) and `sell_prices.yml` (sell),
   loaded by `ShopPricing` into a validated `PriceRegistry` + `ShopCatalog`.
-- Sell prices must stay strictly below the matching buy price.
+- Prices are in ₣฿ (the only currency; the GUI never shows a `$` figure).
+- Sell prices must stay strictly below the matching buy price. The shipped
+  catalogue uses sell = buy − 0.01 so the two read as the same to players.
+- Category membership and display order come from the `categories:` block, in the
+  order the items are listed (Minecraft-creative-like grouping). Do not reorder
+  `PriceRegistry.rules()` with an unordered map — it is what made the GUI shuffle.
 - Reload after edits with `/shopadmin reload` (or restart). `/shop`, `/sell`,
   `/ah`/`aushop`, `/ausell`, `/loan` are all handled by `CommandRouter`.
+- A price can be set on an item that `ItemClassifier` once marked restricted
+  (heads, skulls, `tnt`, `end_crystal`, `lava_bucket`, `respawn_anchor`,
+  `filled_map`); an explicit price makes it buyable again. Only items still in
+  `RESTRICTED_EXACT`/`RESTRICTED_SUFFIX` (creative/admin-only, spawn eggs) stay
+  unbuyable.
+- `ShopPricingConfigTest` loads the shipped YAML and fails the build if any
+  listed item is unpriced, not sellable, or has sell ≥ buy.
 
 ## Conventions
 

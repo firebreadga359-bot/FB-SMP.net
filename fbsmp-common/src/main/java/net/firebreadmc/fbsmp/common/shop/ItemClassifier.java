@@ -20,11 +20,10 @@ public final class ItemClassifier {
             "command_block_minecart", "spawner", "trial_spawner", "vault", "ominous_vault",
             "end_portal_frame", "reinforced_deepslate", "petrified_oak_slab", "budding_amethyst",
             "chorus_plant", "farmland", "frogspawn", "dragon_egg",
-            "tnt", "tnt_minecart", "end_crystal", "lava_bucket", "respawn_anchor",
-            "written_book", "filled_map", "player_head", "experience_bottle", "enchanted_book");
+            "written_book", "player_head", "experience_bottle", "enchanted_book");
 
     private static final Set<String> RESTRICTED_SUFFIX = Set.of(
-            "_spawn_egg", "_head", "_skull", "_banner_pattern");
+            "_spawn_egg", "_banner_pattern");
 
     private static final Set<String> RESTRICTED_PREFIX = Set.of("infested_");
 
@@ -98,6 +97,18 @@ public final class ItemClassifier {
             "slime_ball", "ender_pearl", "ender_eye", "blaze_rod", "ghast_tear", "nautilus_shell",
             "heart_of_the_sea", "prismarine_crystals", "prismarine_shard", "clay_ball", "brick",
             "nether_brick", "snowball", "bone", "ink_sac", "glow_ink_sac", "dye", "feather");
+
+    private static final Set<String> ARMOR_EXACT = Set.of(
+            "turtle_helmet", "shield", "wolf_armor");
+
+    private static final Set<String> ARMOR_SUFFIX = Set.of(
+            "_helmet", "_chestplate", "_leggings", "_boots", "_horse_armor");
+
+    private static final Set<String> WEAPONS_EXACT = Set.of(
+            "bow", "crossbow", "arrow", "spectral_arrow", "trident", "mace", "firework_rocket",
+            "wind_charge", "breeze_rod", "tnt", "tnt_minecart");
+
+    private static final Set<String> WEAPONS_SUFFIX = Set.of("_sword", "_axe");
 
     private static final Pattern FLOWER_LIKE = Pattern.compile(
             "^(dandelion|poppy|blue_orchid|allium|azure_bluet|red_tulip|orange_tulip|white_tulip|"
@@ -192,6 +203,12 @@ public final class ItemClassifier {
         }
         if (UTILITY_EXACT.contains(id)) {
             return ItemCategory.UTILITY;
+        }
+        if (ARMOR_EXACT.contains(id) || ARMOR_SUFFIX.stream().anyMatch(id::endsWith)) {
+            return ItemCategory.ARMOR;
+        }
+        if (WEAPONS_EXACT.contains(id) || WEAPONS_SUFFIX.stream().anyMatch(id::endsWith)) {
+            return ItemCategory.WEAPONS;
         }
         if (BUILDING_SUFFIX.stream().anyMatch(id::endsWith)) {
             return ItemCategory.BUILDING;

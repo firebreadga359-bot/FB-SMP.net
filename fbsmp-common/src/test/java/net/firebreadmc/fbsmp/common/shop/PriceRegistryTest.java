@@ -48,13 +48,25 @@ class PriceRegistryTest {
     void restrictedItemsHaveNoPrices() {
         PriceRegistry registry = registry();
         for (String id : List.of("bedrock", "barrier", "spawner", "zombie_spawn_egg",
-                "dragon_egg", "tnt", "command_block")) {
+                "dragon_egg", "command_block")) {
             PriceRegistry.Rule rule = registry.rule(id);
             assertEquals(PriceRegistry.Source.RESTRICTED, rule.source(), id);
             assertFalse(rule.buyable(), id);
             assertFalse(rule.sellable(), id);
             assertNull(rule.buyMinor(), id);
         }
+    }
+
+    @Test
+    void explicitlyPricedItemsAreBuyableEvenWhenOnceBlocked() {
+        PriceRegistry registry = PriceRegistry.builder()
+                .explicitBuy("tnt", 11390)
+                .explicitSell("tnt", 11389)
+                .build(REGISTRY);
+        PriceRegistry.Rule rule = registry.rule("tnt");
+        assertEquals(PriceRegistry.Source.EXPLICIT, rule.source());
+        assertTrue(rule.buyable());
+        assertTrue(rule.sellable());
     }
 
     @Test

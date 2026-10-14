@@ -1,6 +1,7 @@
 package net.firebreadmc.fbsmp.common.shop;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -54,10 +55,18 @@ public final class ShopCatalog {
             all.add(entry);
             grouped.computeIfAbsent(rule.category(), key -> new ArrayList<>()).add(entry);
         }
+        // Curated order from the config, then item id as a stable tie-break, so a
+        // category reads in the intended sequence rather than a shuffled one.
+        Comparator<Entry> display = Comparator
+                .comparingInt((Entry e) -> registry.orderIndex(e.itemId()))
+                .thenComparing(Entry::itemId);
         Map<ItemCategory, List<Entry>> frozen = new EnumMap<>(ItemCategory.class);
         for (Map.Entry<ItemCategory, List<Entry>> e : grouped.entrySet()) {
-            frozen.put(e.getKey(), List.copyOf(e.getValue()));
+            List<Entry> ordered = new ArrayList<>(e.getValue());
+            ordered.sort(display);
+            frozen.put(e.getKey(), List.copyOf(ordered));
         }
+        all.sort(display);
         return new ShopCatalog(frozen, List.copyOf(all));
     }
 

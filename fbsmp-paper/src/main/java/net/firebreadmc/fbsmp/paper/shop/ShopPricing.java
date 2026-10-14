@@ -72,13 +72,16 @@ public final class ShopPricing {
         if (section == null) {
             return;
         }
+        int order = 0;
         for (String categoryName : section.getKeys(false)) {
             ItemCategory category = categoryFor(categoryName);
             if (category == null) {
                 continue;
             }
             for (String item : section.getStringList(categoryName + ".items")) {
-                builder.category(normalizeKey(item), category);
+                String id = normalizeKey(item);
+                builder.category(id, category);
+                builder.order(id, order++);
             }
         }
     }

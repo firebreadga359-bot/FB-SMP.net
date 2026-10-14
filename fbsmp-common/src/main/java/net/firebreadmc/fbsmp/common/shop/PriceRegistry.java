@@ -44,11 +44,21 @@ public final class PriceRegistry {
     }
 
     private final Map<String, Rule> rules;
+    private final Map<String, Integer> order;
     private final Set<String> disabled;
 
-    private PriceRegistry(Map<String, Rule> rules, Set<String> disabled) {
-        this.rules = Map.copyOf(rules);
+    private PriceRegistry(Map<String, Rule> rules, Map<String, Integer> order, Set<String> disabled) {
+        // LinkedHashMap over the builder's TreeMap keeps rules() in a stable,
+        // deterministic order; Map.copyOf would leave it unspecified.
+        this.rules = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(rules));
+        this.order = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(order));
         this.disabled = Set.copyOf(disabled);
+    }
+
+    /** Curated display position of an item, or {@link Integer#MAX_VALUE} when unset. */
+    public int orderIndex(String itemId) {
+        Integer index = order.get(ItemClassifier.normalize(itemId));
+        return index == null ? Integer.MAX_VALUE : index;
     }
 
     public Rule rule(String itemId) {
@@ -97,6 +107,7 @@ public final class PriceRegistry {
         private final Map<String, Long> explicitBuy = new LinkedHashMap<>();
         private final Map<String, Long> explicitSell = new LinkedHashMap<>();
         private final Map<String, ItemCategory> categoryOverrides = new LinkedHashMap<>();
+        private final Map<String, Integer> order = new LinkedHashMap<>();
         private final Set<String> disabled = new java.util.LinkedHashSet<>();
         private BigDecimal sellRatio = DEFAULT_SELL_RATIO;
 
@@ -112,6 +123,12 @@ public final class PriceRegistry {
 
         public Builder category(String itemId, ItemCategory category) {
             categoryOverrides.put(ItemClassifier.normalize(itemId), category);
+            return this;
+        }
+
+        /** Records a curated display position; later calls win. */
+        public Builder order(String itemId, int index) {
+            order.put(ItemClassifier.normalize(itemId), index);
             return this;
         }
 
@@ -148,7 +165,7 @@ public final class PriceRegistry {
             for (String id : explicitSell.keySet()) {
                 rules.computeIfAbsent(id, this::buildRule);
             }
-            return new PriceRegistry(rules, disabled);
+            return new PriceRegistry(rules, order, disabled);
         }
 
         private Rule buildRule(String id) {
