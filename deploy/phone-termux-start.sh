@@ -21,7 +21,10 @@
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
-SOCK=/tmp/playit.sock
+# Android blocks writes to /tmp; use Termux's writable tmp under $PREFIX.
+TMP_DIR="${PREFIX:-/tmp}/tmp"
+mkdir -p "$TMP_DIR"
+SOCK="$TMP_DIR/playit.sock"
 
 WS_TCP_URL="${WS_TCP_URL:-wss://3000-826b241b-32c1-4cf5-a93f-38287f184ad6.daytonaproxy01.eu/}"
 WS_UDP_URL="${WS_UDP_URL:-wss://3001-826b241b-32c1-4cf5-a93f-38287f184ad6.daytonaproxy01.eu/}"
