@@ -19,7 +19,8 @@
 #   - Minecraft Bedrock -> 127.0.0.1:19132
 # Playit then shows your public addresses (xxx.playit.gg:port) to give players.
 set -e
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 SOCK=/tmp/playit.sock
 
 WS_TCP_URL="${WS_TCP_URL:-wss://3000-826b241b-32c1-4cf5-a93f-38287f184ad6.daytonaproxy01.eu/}"
@@ -43,7 +44,11 @@ if [ ! -x ./playit-cli ]; then
 fi
 
 echo "==> Starting local relays (25565 TCP, 19132 UDP -> sandbox)"
-python fb-smp-connect.py > relay.log 2>&1 &
+if [ ! -f "$SCRIPT_DIR/fb-smp-connect.py" ]; then
+  echo "ERROR: fb-smp-connect.py not found next to this script in $SCRIPT_DIR" >&2
+  exit 1
+fi
+python "$SCRIPT_DIR/fb-smp-connect.py" > relay.log 2>&1 &
 RELAY_PID=$!
 sleep 3
 if ! kill -0 "$RELAY_PID" 2>/dev/null; then
